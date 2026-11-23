@@ -2,11 +2,23 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#087ec0"><meta name="description" content="A sunny, original blob volleyball arcade game."><link rel="manifest" href="./manifest.webmanifest"><title>Rico Blobby Volleyball</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,sans-serif;background:#053d65;color:white}body{display:flex;justify-content:center}main{width:min(100%,1100px);padding:14px 12px 22px}header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}h1{font-size:clamp(1.2rem,3.2vw,2rem);margin:4px 0 10px}button,select{font:inherit;border:0;border-radius:12px;padding:10px 13px;background:#fff;color:#143b58;font-weight:700}button{cursor:pointer}button:focus-visible,select:focus-visible{outline:3px solid #ffcc33}button.primary{background:#ffca46}label{display:inline-flex;gap:7px;align-items:center}.settings{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-bottom:12px}.frame{position:relative;overflow:hidden;border-radius:18px;border:3px solid #fff6;box-shadow:0 12px 30px #001a3280}canvas{width:100%;height:auto;aspect-ratio:16/9;display:block;touch-action:none}.overlay{position:absolute;inset:0;display:grid;place-items:center;background:#001a3285;text-align:center;padding:20px}.overlay[hidden]{display:none}.panel{background:#083e68e8;padding:22px;border-radius:20px;max-width:400px}.panel h2{margin:0 0 10px}.panel p{line-height:1.5}.controls{display:flex;justify-content:space-between;gap:20px;margin-top:12px;user-select:none}.pad{display:flex;gap:8px}.touch{min-width:64px;min-height:64px;background:#ffffffdf;font-size:25px;touch-action:none;-webkit-user-select:none;user-select:none}.touch:active,.touch.down{background:#ffca46}.help{opacity:.86;font-size:14px;line-height:1.5;margin-top:13px}footer{opacity:.7;font-size:12px;margin-top:15px}@media(pointer:fine){.touch{min-width:58px;min-height:58px}}@media(max-width:600px){main{padding:7px}.settings{font-size:13px}.settings button,.settings select{padding:8px}.touch{min-width:54px;min-height:59px}.controls{gap:8px}}
-</style></head><body><main><header><h1>🏐 Rico Blobby Volleyball <small style="font-size:.45em">v1.0.0</small></h1><span id="status" aria-live="polite">Ready to play</span></header>
-<div class="settings"><label>Mode <select id="mode"><option value="ai">1 player vs CPU</option><option value="local">2 players</option></select></label><label>Difficulty <select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><button id="sound" aria-pressed="true">🔊 Sound on</button><button id="restart">↻ Restart</button></div>
+
+.controls{display:none}
+.touch-device .controls,.show-touch .controls{display:flex}
+.touch-device .touch,.show-touch .touch{min-width:clamp(66px,17vw,94px);min-height:clamp(68px,15vw,90px);border-radius:18px;box-shadow:0 4px 0 #113c5c;font-size:30px}
+.touch-device .pad,.show-touch .pad{gap:10px}
+.touch-device .controls,.show-touch .controls{padding:9px 2px 0;align-items:end}
+.touch-device .help.keyboard-help{display:none}
+.keyboard-device .help.touch-help{display:none}
+#bluePad[hidden]{display:none!important}
+.device-note{font-size:13px;opacity:.92}
+@media(max-width:680px){header h1{font-size:1.1rem}.settings{margin-bottom:7px}.touch-device .touch,.show-touch .touch{min-width:clamp(58px,17vw,83px);min-height:65px}.touch-device .pad,.show-touch .pad{gap:6px}.touch-device .controls,.show-touch .controls{gap:6px}}
+@media(orientation:landscape) and (max-height:540px){main{padding:4px 9px}header h1{margin:0;font-size:1rem}.settings{gap:7px;margin-bottom:5px}.settings button,.settings select{padding:5px 8px}.touch-device .controls,.show-touch .controls{margin-top:4px}.touch-device .touch,.show-touch .touch{min-height:54px;min-width:66px}.help{margin-top:5px}}
+</style></head><body><main><header><h1>🏐 Rico Blobby Volleyball <small style="font-size:.45em">v1.0.1</small></h1><span id="status" aria-live="polite">Ready to play</span></header>
+<div class="settings"><label>Mode <select id="mode"><option value="ai">1 player vs CPU</option><option value="local">2 players</option></select></label><label>Difficulty <select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><button id="sound" aria-pressed="true">🔊 Sound on</button><button id="restart">↻ Restart</button><button id="controlToggle" aria-pressed="false">🎮 Show touch controls</button><span class="device-note" id="deviceNote"></span></div>
 <div class="frame"><canvas id="game" width="960" height="540" aria-label="Volleyball game with a red blob on the left and a blue blob on the right"></canvas><div id="overlay" class="overlay"><div class="panel"><h2 id="overlayTitle">Beach volleyball time!</h2><p id="overlayText">First to 15 points wins. Control Red using A, D and W, or touch controls. Play against Blue CPU or another player.</p><button class="primary" id="start">▶ Play</button></div></div></div>
 <div class="controls"><div><strong>🔴 Red</strong><div class="pad"><button class="touch" data-key="left" aria-label="Red left">◀</button><button class="touch" data-key="right" aria-label="Red right">▶</button><button class="touch" data-key="jump" aria-label="Red jump">⬆</button></div></div><div id="bluePad"><strong>🔵 Blue</strong><div class="pad"><button class="touch" data-key="bLeft" aria-label="Blue left">◀</button><button class="touch" data-key="bRight" aria-label="Blue right">▶</button><button class="touch" data-key="bJump" aria-label="Blue jump">⬆</button></div></div></div>
-<p class="help">Mac keyboard: 🔴 A / D to move, W to jump. 🔵 Arrow Left / Arrow Right to move, Arrow Up to jump (2-player mode). On touchscreens, use the buttons. Press Space to pause or resume.</p><footer>Original arcade-style game · Developed by: Engr. Rico J. Pono</footer>
+<p class="help keyboard-help">⌨️ Mac keyboard: Red uses A / D / W (left / right / jump). In 2-player mode, Blue uses ← / → / ↑. Press Space to pause.</p><p class="help touch-help">📱 Use the large on-screen buttons. For more room, rotate your iPhone into landscape orientation. Hold a direction while tapping jump.</p><footer>Original arcade-style game · Developed by: Engr. Rico J. Pono</footer>
 <script>
 (()=>{'use strict';
 const canvas=document.getElementById('game'),ctx=canvas.getContext('2d'),W=960,H=540,ground=463,netX=480,netTop=305,netHalf=8;
@@ -35,8 +47,25 @@ function draw(){const sky=ctx.createLinearGradient(0,0,0,H);sky.addColorStop(0,'
 ctx.save();ctx.translate(ball.x,ball.y);const rot=frame*.035;ctx.rotate(rot);const g=ctx.createRadialGradient(-5,-7,3,0,0,ball.r);g.addColorStop(0,'#fff');g.addColorStop(1,'#aab2ba');ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,ball.r,0,7);ctx.fill();ctx.strokeStyle='#6c7885';ctx.lineWidth=1.2;for(let i=-1;i<=1;i++){ctx.beginPath();ctx.ellipse(0,0,ball.r*.28+i*ball.r*.27,ball.r,0,0,7);ctx.stroke()}ctx.restore();
 ctx.textAlign='center';ctx.fillStyle='#083451aa';ctx.fillRect(369,15,222,64);ctx.fillStyle='white';ctx.font='bold 36px system-ui';ctx.fillText(red.score+'  :  '+blue.score,480,60);ctx.font='bold 18px system-ui';ctx.fillText('RED',140,46);ctx.fillText('BLUE',820,46)}
 function loop(t){const dt=Math.min(2,(t-last)/16.666||1);last=t;if(playing&&!paused)simulate(dt);draw();requestAnimationFrame(loop)}
+function configureControls(){
+const touchCapable=matchMedia('(pointer: coarse)').matches||navigator.maxTouchPoints>0;
+document.body.classList.toggle('touch-device',touchCapable);
+document.body.classList.toggle('keyboard-device',!touchCapable);
+$('deviceNote').textContent=touchCapable?'📱 Touch mode':'⌨️ Keyboard mode';
+$('controlToggle').textContent=touchCapable?'⌨️ Hide touch controls':'🎮 Show touch controls';
+$('controlToggle').setAttribute('aria-pressed',String(touchCapable));
+$('bluePad').hidden=$('mode').value!=='local';
+}
+$('controlToggle').onclick=()=>{
+const shown=document.querySelector('.controls').getBoundingClientRect().height>0;
+document.body.classList.toggle('show-touch',!shown);
+document.body.classList.toggle('touch-device',false);
+document.body.classList.toggle('keyboard-device',shown);
+$('controlToggle').textContent=shown?'🎮 Show touch controls':'⌨️ Hide touch controls';
+$('controlToggle').setAttribute('aria-pressed',String(!shown));
+};
 const bind={KeyA:'left',KeyD:'right',KeyW:'jump',ArrowLeft:'bLeft',ArrowRight:'bRight',ArrowUp:'bJump'};window.addEventListener('keydown',e=>{if(bind[e.code]){e.preventDefault();keys.add(bind[e.code])}if(e.code==='Space'){e.preventDefault();if(!playing)return;paused=!paused;if(paused)show('Paused','Press Space or Resume to continue','▶ Resume');else $('overlay').hidden=true}});window.addEventListener('keyup',e=>{if(bind[e.code]){e.preventDefault();keys.delete(bind[e.code])}});window.addEventListener('blur',()=>{keys.clear();touchState={}});
 document.querySelectorAll('.touch').forEach(btn=>{const k=btn.dataset.key;const release=e=>{e.preventDefault();touchState[k]=false;btn.classList.remove('down')};btn.addEventListener('pointerdown',e=>{e.preventDefault();btn.setPointerCapture(e.pointerId);touchState[k]=true;btn.classList.add('down')});btn.addEventListener('pointerup',release);btn.addEventListener('pointercancel',release);btn.addEventListener('lostpointercapture',release)});
-$('start').onclick=()=>start();$('restart').onclick=reset;$('mode').onchange=()=>{document.getElementById('bluePad').style.visibility=$('mode').value==='ai'?'hidden':'visible';reset()};$('difficulty').onchange=()=>reset();$('sound').onclick=()=>{sound=!sound;$('sound').textContent=sound?'🔊 Sound on':'🔇 Sound off';$('sound').setAttribute('aria-pressed',String(sound))};$('bluePad').style.visibility='hidden';reset();requestAnimationFrame(loop);if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+$('start').onclick=()=>start();$('restart').onclick=reset;$('mode').onchange=()=>{$('bluePad').hidden=$('mode').value!=='local';reset()};$('difficulty').onchange=()=>reset();$('sound').onclick=()=>{sound=!sound;$('sound').textContent=sound?'🔊 Sound on':'🔇 Sound off';$('sound').setAttribute('aria-pressed',String(sound))};configureControls();reset();requestAnimationFrame(loop);if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 })();
 </script></main></body></html>
