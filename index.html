@@ -41,7 +41,7 @@ body.fullscreen .hud .mini{font-size:clamp(10px,1.5vw,13px);padding:5px 7px}
 #controls .arrow-left{transform:rotate(-90deg)}
 #controls .arrow-right{transform:rotate(90deg)}
 #controls .arrow-up{transform:none}
-</style></head><body><main><header><h1>🏐 Rico Blobby Volleyball <small>v1.9.0</small></h1><small>iPhone & smartphone edition</small></header>
+</style></head><body><main><header><h1>🏐 Rico Blobby Volleyball <small>v2.0.0</small></h1><small>iPhone & smartphone edition</small></header>
 <div class="options"><label>CPU <select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><button id="sound">🔊 Sound</button><button id="outsideReset">↻ Restart</button><button id="outsideFull">⛶ Fullscreen</button></div>
 <div id="stage" class="stage"><canvas id="game" width="800" height="500" aria-label="Red and blue blobs playing volleyball on a beach"></canvas>
 <div class="hud"><span id="status" class="mini" style="font-size:12px">Ready</span><div class="buttons"><button id="restart" class="mini" aria-label="Restart the game">↻ Restart</button><button id="fullscreen" class="mini" aria-label="Toggle fullscreen">⛶ Expand</button></div></div>
@@ -53,7 +53,7 @@ body.fullscreen .hud .mini{font-size:clamp(10px,1.5vw,13px);padding:5px 7px}
 (()=>{'use strict';
 const $=id=>document.getElementById(id),stage=$('stage'),canvas=$('game'),ctx=canvas.getContext('2d');
 let W=800,netX=400;const H=500,ground=430,netTop=262,netHalf=7;
-const red={x:195,y:ground,vy:0,vx:0,r:49.45,score:0,jelly:0,jellyV:0},blue={x:605,y:ground,vy:0,vx:0,r:49.45,score:0,jelly:0,jellyV:0};
+const red={x:195,y:ground,vy:0,vx:0,r:49.45,score:0,jelly:0,jellyV:0,movePhase:0,hitCooldown:0,movePhase:0,hitCooldown:0},blue={x:605,y:ground,vy:0,vx:0,r:49.45,score:0,jelly:0,jellyV:0};
 const ball={x:195,y:260,vx:0,vy:0,r:36};
 let running=false,awaitServe=true,last=0,frame=0,sound=true,audio=null,scoreTimer=0,server='red',serveDelay=0;
 const pressed={left:false,right:false,jump:false};
@@ -81,8 +81,8 @@ function wakeAudio(){try{audio??=new(window.AudioContext||window.webkitAudioCont
 function clearInput(){for(const k in pressed)pressed[k]=false;document.querySelectorAll('.control').forEach(b=>b.classList.remove('pressed'))}
 function serveReset(side='red'){
  server=side;
- red.x=W*.245;red.y=ground;red.vx=0;red.vy=0;red.jelly=0;red.jellyV=0;
- blue.x=W*.755;blue.y=ground;blue.vx=0;blue.vy=0;blue.jelly=0;blue.jellyV=0;
+ red.x=W*.245;red.y=ground;red.vx=0;red.vy=0;red.jelly=0;red.jellyV=0;red.movePhase=0;red.hitCooldown=0;
+ blue.x=W*.755;blue.y=ground;blue.vx=0;blue.vy=0;blue.jelly=0;blue.jellyV=0;blue.movePhase=0;blue.hitCooldown=0;
  ball.x=side==='red'?red.x:blue.x;
  ball.y=ground-170;ball.vx=0;ball.vy=0;awaitServe=true;scoreTimer=0;serveDelay=0;clearInput();
  $('message').textContent=side==='red'?'Jump to serve from your court':'Blue serves next';
@@ -98,6 +98,9 @@ function score(side){
 }
 function move(p,dir,jump,dt){
  p.vx=dir*6.6*(W/800);p.x+=p.vx*dt;
+ p.hitCooldown=Math.max(0,p.hitCooldown-dt);
+ if(dir!==0&&p.y>=ground-.1){p.movePhase+=dt*.29;p.jellyV+=Math.sin(p.movePhase*2)*.006*dt}
+ else if(p.y>=ground-.1){p.movePhase+=dt*.12}
  const left=p===red?p.r:netX+netHalf+p.r,right=p===red?netX-netHalf-p.r:W-p.r;
  p.x=Math.max(left,Math.min(right,p.x));
  if(jump&&p.y>=ground-.1){p.vy=-15.5;p.jellyV+=.22;playTone(210)}
@@ -111,7 +114,35 @@ function move(p,dir,jump,dt){
  p.jelly+=p.jellyV*dt;
  p.jelly=Math.max(-.32,Math.min(.32,p.jelly));
 }
-function collide(p){const cx=p.x,cy=p.y-p.r*.8,dx=ball.x-cx,dy=ball.y-cy,d=Math.hypot(dx,dy)||1,range=ball.r+p.r*.88;if(d>=range)return;const nx=dx/d,ny=dy/d;ball.x=cx+nx*range;ball.y=cy+ny*range;awaitServe=false;p.jellyV+=Math.max(-.22,Math.min(.22,-ny*.22));const striking=p===red;const strikeSpeed=Math.max(8,Math.hypot(p.vx-ball.vx,p.vy-ball.vy));ball.vx=Math.max(-10*(W/800),Math.min(10*(W/800),nx*strikeSpeed*.75+p.vx*.52+(striking?2.5:-2.5)*(W/800)));ball.vy=Math.max(-16,Math.min(-5,ny*strikeSpeed*.82-5));playTone(390);$('message').textContent=''}
+function collide(p){
+ // Treat the Blobby as a plump ellipse matching its drawn bell shape,
+ // expanded by the ball radius. This keeps the visible ball outside the body.
+ const cx=p.x,cy=p.y-p.r*1.05;
+ const rx=p.r*1.02+ball.r+2,ry=p.r*1.08+ball.r+2;
+ const dx=ball.x-cx,dy=ball.y-cy;
+ const normalized=Math.hypot(dx/rx,dy/ry);
+ if(normalized>=1)return;
+ const norm=Math.max(normalized,.0001);
+ let nx=dx/(rx*rx),ny=dy/(ry*ry);
+ const nl=Math.hypot(nx,ny)||1;nx/=nl;ny/=nl;
+ // Push ball completely outside the expanded silhouette.
+ ball.x=cx+dx/norm*1.012;
+ ball.y=cy+dy/norm*1.012;
+ if(p.hitCooldown>0)return;
+ const relative=ball.vx*nx+(ball.vy-p.vy)*ny;
+ if(relative>0.5&&!awaitServe)return;
+ p.hitCooldown=6;
+ p.jellyV+=Math.max(-.25,Math.min(.25,-ny*.24));
+ const striking=p===red,dir=striking?1:-1;
+ const speed=Math.max(8,Math.hypot(ball.vx-p.vx,ball.vy-p.vy));
+ let vx=nx*speed*.72+p.vx*.44+dir*3.2*(W/800);
+ if(awaitServe)vx=dir*Math.max(5,Math.min(9,Math.abs(vx)));
+ ball.vx=Math.max(-10*(W/800),Math.min(10*(W/800),vx));
+ ball.vy=Math.max(-17,Math.min(-6,ny*speed*.9-6));
+ awaitServe=false;
+ playTone(390);
+ $('message').textContent='';
+}
 function tick(dt){
  frame+=dt;
  move(red,(pressed.right?1:0)-(pressed.left?1:0),pressed.jump,dt);
@@ -135,7 +166,7 @@ function tick(dt){
  ball.vy+=.3*dt;ball.x+=ball.vx*dt;ball.y+=ball.vy*dt;
  if(ball.x<ball.r){ball.x=ball.r;ball.vx=Math.abs(ball.vx)*.9}
  if(ball.x>W-ball.r){ball.x=W-ball.r;ball.vx=-Math.abs(ball.vx)*.9}
- if(ball.y<ball.r+2){ball.y=ball.r+2;ball.vy=Math.abs(ball.vy)*.9}
+ // Open sky: the ball can rise beyond the visible court and return under gravity.
  if(ball.y+ball.r>netTop&&ball.y-ball.r<ground&&Math.abs(ball.x-netX)<ball.r+netHalf){
    if(lastY+ball.r<=netTop&&ball.vy>0){ball.y=netTop-ball.r;ball.vy=-Math.abs(ball.vy)*.82}
    else if(ball.x<netX){ball.x=netX-netHalf-ball.r;ball.vx=-Math.abs(ball.vx)*.88}
@@ -234,11 +265,15 @@ function renderBackdrop(){
  c.fillStyle=rim;c.fillRect(0,ground-6,w,22);
 }
 function drawBlob(p,color){
+ const moving=Math.min(1,Math.abs(p.vx)/Math.max(1,6.6*W/800));
+ const bounce=moving*.045*Math.sin(p.movePhase*2);
  const x=p.x,r=p.r,top=p.y-r*2.05,bottom=p.y+3;
  ctx.save();
+ // The moving blob gently bobs and squashes even without jumping.
+ ctx.translate(0,-Math.abs(bounce)*r*.5);
  // Artwork deforms, while collision rules remain stable.
  // Positive jelly = taller and narrower; negative = squashed and wider.
- const stretch=p.jelly,scaleY=1+stretch,scaleX=1/Math.sqrt(scaleY);
+ const stretch=Math.max(-.32,Math.min(.32,p.jelly+bounce)),scaleY=1+stretch,scaleX=1/Math.sqrt(scaleY);
  ctx.translate(x,p.y+3);ctx.scale(scaleX,scaleY);ctx.translate(-x,-(p.y+3));
  let shadow=ctx.createRadialGradient(x+9,ground+10,4,x+9,ground+10,r*1.45);
  shadow.addColorStop(0,'rgba(40,35,26,.34)');shadow.addColorStop(1,'rgba(40,35,26,0)');
@@ -301,7 +336,15 @@ function draw(){
  const shad=ctx.createRadialGradient(ball.x,ground+10,0,ball.x,ground+10,Math.max(10,ball.r*1.5));
  shad.addColorStop(0,'#33332b75');shad.addColorStop(1,'#33332b00');
  ctx.fillStyle=shad;ctx.beginPath();ctx.ellipse(ball.x,ground+9,Math.max(12,ball.r*1.5-(ground-ball.y)*.045),8,0,0,7);ctx.fill();
- drawBall();
+ if(ball.y+ball.r<0){
+  // Locate the ball while it is above the visible sky.
+  const x=Math.max(26,Math.min(W-26,ball.x)),y=108;
+  ctx.save();ctx.shadowColor='#102d4bb0';ctx.shadowBlur=8;
+  ctx.fillStyle='#ffe067';ctx.strokeStyle='#5e4314';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(x,y-23);ctx.lineTo(x-16,y-4);ctx.lineTo(x-6,y-4);ctx.lineTo(x-6,y+13);ctx.lineTo(x+6,y+13);ctx.lineTo(x+6,y-4);ctx.lineTo(x+16,y-4);ctx.closePath();
+  ctx.fill();ctx.stroke();
+  ctx.restore();
+ }
  ctx.textAlign='center';ctx.font='bold 19px system-ui';ctx.lineWidth=3;
  ctx.strokeStyle='#1d3545bb';ctx.fillStyle='#fff';
  ctx.strokeText('PLAYER',W*.11,82);ctx.fillText('PLAYER',W*.11,82);
