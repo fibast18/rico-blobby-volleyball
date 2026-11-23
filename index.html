@@ -68,8 +68,8 @@ body.game-fullscreen main{padding:0;width:100%;max-width:none}
 body.game-fullscreen header,body.game-fullscreen .settings,body.game-fullscreen .help,body.game-fullscreen footer{display:none}
 body.game-fullscreen #court{position:fixed;inset:0;z-index:9999;border:0;border-radius:0;background:#073d66;display:flex;align-items:center;justify-content:center}
 body.game-fullscreen #court canvas{width:min(100vw,calc(100dvh * 40 / 27));height:auto;max-height:100dvh;object-fit:contain}
-body.game-fullscreen #court .controls{width:min(100vw,calc(100dvh * 40 / 27));left:50%;right:auto;bottom:50%;transform:translate(-50%,50%);height:auto;aspect-ratio:40/27;pointer-events:none}
-body.game-fullscreen #court .controls:has(#bluePad[hidden]){height:13%!important;bottom:calc((100dvh - min(100vw * 27 / 40,100dvh))/2)}
+body.game-fullscreen #court .controls{width:min(100vw,calc(100dvh * 40 / 27));left:50%;right:auto;bottom:calc((100dvh - min(100vw * 27 / 40,100dvh))/2);transform:translateX(-50%);pointer-events:none}
+body.game-fullscreen #court .controls:has(#bluePad[hidden]){height:calc(min(100vw * 27 / 40,100dvh) * .13)!important;bottom:calc((100dvh - min(100vw * 27 / 40,100dvh))/2)}
 body.game-fullscreen #court .overlay{inset:0}
 @media(orientation:landscape){body.game-fullscreen #court canvas{width:min(100vw,calc(100dvh * 40 / 27))}}
 </style></head><body><main><header><h1>🏐 Rico Blobby Volleyball <small style="font-size:.45em">v1.3.0</small></h1><span id="status" aria-live="polite">Ready to play</span></header>
