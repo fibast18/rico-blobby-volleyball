@@ -34,6 +34,7 @@ jobs:
           Path('/tmp/rico-game.js').write_text('\n'.join(scripts))
           PY
           node --check /tmp/rico-game.js
+          node tests/blue-ai-regression.cjs
           python3 - <<'PY'
           from pathlib import Path
           page = Path('index.html').read_text()
@@ -49,9 +50,10 @@ jobs:
           assert 'const direction=p===red?1:-1' not in collide, "Unfair fixed-direction shots found"
           ai = page.split("function tick(dt){", 1)[1].split("move(blue,dir,jump,dt);", 1)[0]
           assert "const serveTarget=clampBlue(ball.x+offset)" in ai, "CPU angled serve positioning missing"
-          assert "const target=clampBlue(defensiveX+positionOffset)" in ai, "Near-net interception target missing"
+          assert "let target=clampBlue(defensiveX+positionOffset)" in ai, "Near-net interception target missing"
           assert "const nearNet=" in ai and "const groundT=" in ai, "Near-net landing prediction missing"
           assert "const ballTooHighForStanding=" in ai, "Grounded defense guard missing"
+          assert "cpuJumpPlan={at:" in ai, "Predictive airborne jump scheduling missing"
           assert "cpuJumpCooldown" in ai and "cpuJumpArmed" in ai, "CPU bounce-loop protection missing"
           assert 'const LEARN_KEY=' in page, "AI storage missing"
           assert 'function learnFromRally(result)' in page, "Outcome learning missing"
