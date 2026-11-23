@@ -43,6 +43,10 @@ jobs:
           assert 'ball.y<ball.r+8' in draw, "Offscreen ball marker missing"
           assert 'Dynamic Island' in page, "iPhone portrait safe-area layout missing"
           assert 'function serveReset(side=' in page, "Winner-side serve reset missing"
+          collide = page.split('function collide(p){', 1)[1].split('function tick(dt)', 1)[0]
+          assert 'const approach=relX*nx+relY*ny' in collide, "Angle-aware bounce missing"
+          assert 'const reflectedX=' in collide and 'const reflectedY=' in collide, "Surface reflection missing"
+          assert 'const direction=p===red?1:-1' not in collide, "Unfair fixed-direction shots found"
           PY
   deploy:
     needs: validate
