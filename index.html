@@ -60,7 +60,7 @@ body.fullscreen .hud .mini{font-size:clamp(10px,1.5vw,13px);padding:5px 7px}
  body.fullscreen .stage{width:100vw!important;height:100dvh!important}
  body.fullscreen .options{display:none!important}
 }
-</style></head><body><main><header><h1>🏐 Rico Blobby Volleyball <small>v2.0.3</small></h1><small>iPhone & smartphone edition</small></header>
+</style></head><body><main><header><h1>🏐 Rico Blobby Volleyball <small>v2.0.4</small></h1><small>iPhone & smartphone edition</small></header>
 <div class="options"><label>CPU <select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><button id="sound">🔊 Sound</button><button id="outsideReset">↻ Restart</button><button id="outsideFull">⛶ Fullscreen</button></div>
 <div id="stage" class="stage"><canvas id="game" width="800" height="500" aria-label="Red and blue blobs playing volleyball on a beach"></canvas>
 <div class="hud"><span id="status" class="mini" style="font-size:12px">Ready</span><div class="buttons"><button id="restart" class="mini" aria-label="Restart the game">↻ Restart</button><button id="fullscreen" class="mini" aria-label="Toggle fullscreen">⛶ Expand</button></div></div>
@@ -74,7 +74,7 @@ const $=id=>document.getElementById(id),stage=$('stage'),canvas=$('game'),ctx=ca
 let W=800,netX=400;const H=500,ground=430,netTop=262,netHalf=7;
 const red={x:195,y:ground,vy:0,vx:0,r:49.45,score:0,jelly:0,jellyV:0,movePhase:0,hitCooldown:0,movePhase:0,hitCooldown:0},blue={x:605,y:ground,vy:0,vx:0,r:49.45,score:0,jelly:0,jellyV:0};
 const ball={x:195,y:260,vx:0,vy:0,r:36};
-let running=false,awaitServe=true,last=0,frame=0,sound=true,audio=null,scoreTimer=0,server='red',serveDelay=0,rallyTicks=0,lastTouch=null,touchLock=0;
+let running=false,awaitServe=true,last=0,frame=0,sound=true,audio=null,scoreTimer=0,server='red',serveDelay=0,rallyTicks=0,lastTouch=null,touchLock=0,cpuJumpCooldown=0,cpuJumpArmed=true;
 const pressed={left:false,right:false,jump:false};
 function playTone(freq){if(!sound)return;try{audio??=new(window.AudioContext||window.webkitAudioContext)();const o=audio.createOscillator(),g=audio.createGain();o.frequency.value=freq;o.type='sine';g.gain.setValueAtTime(.035,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+.09);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+.1)}catch{}}
 function sandSound(impact){
@@ -103,7 +103,7 @@ function serveReset(side='red'){
  red.x=W*.245;red.y=ground;red.vx=0;red.vy=0;red.jelly=0;red.jellyV=0;red.movePhase=0;red.hitCooldown=0;
  blue.x=W*.755;blue.y=ground;blue.vx=0;blue.vy=0;blue.jelly=0;blue.jellyV=0;blue.movePhase=0;blue.hitCooldown=0;
  ball.x=side==='red'?red.x:blue.x;
- ball.y=ground-170;ball.vx=0;ball.vy=0;awaitServe=true;scoreTimer=0;serveDelay=0;rallyTicks=0;lastTouch=null;touchLock=0;clearInput();
+ ball.y=ground-170;ball.vx=0;ball.vy=0;awaitServe=true;scoreTimer=0;serveDelay=0;rallyTicks=0;lastTouch=null;touchLock=0;cpuJumpCooldown=0;cpuJumpArmed=true;clearInput();
  $('message').textContent=side==='red'?'Jump to serve from your court':'Blue serves next';
 }
 function begin(){if(applyPendingUpdate())return;red.score=0;blue.score=0;frame=0;serveReset('red');running=true;$('overlay').hidden=true;$('status').textContent='Playing'}
@@ -177,18 +177,44 @@ function tick(dt){
  move(red,(pressed.right?1:0)-(pressed.left?1:0),pressed.jump,dt);
  const difficulty=$('difficulty').value;
  let dir=0,jump=false;
+ cpuJumpCooldown=Math.max(0,cpuJumpCooldown-dt);
+ const blueMin=netX+netHalf+blue.r,blueMax=W-blue.r;
+ const offset=(blue.r+ball.r)*.59; // Off-center: contact the LEFT side of Blue to return left.
+ const clampBlue=x=>Math.max(blueMin,Math.min(blueMax,x));
  if(awaitServe&&server==='blue'){
-  // CPU waits briefly, then jumps under its own stationary serve.
+  // CPU serve: shuffle to the right of its own stationary ball before jumping.
   serveDelay+=dt;
-  dir=0;
-  jump=serveDelay>34&&blue.y>=ground-.1;
+  const serveTarget=clampBlue(ball.x+offset);
+  dir=serveTarget>blue.x+6?1:serveTarget<blue.x-6?-1:0;
+  if(serveDelay>32&&Math.abs(serveTarget-blue.x)<15&&blue.y>=ground-.1&&cpuJumpCooldown===0){
+   jump=true;cpuJumpCooldown=30;cpuJumpArmed=false;
+  }
  }else if(!awaitServe){
- const target=ball.x>netX?Math.max(netX+blue.r+netHalf,Math.min(W-blue.r,ball.x+ball.vx*(difficulty==='hard'?8:difficulty==='normal'?5:2))):W*.755;
- const gap=difficulty==='easy'?55:difficulty==='normal'?25:13;
- dir=target>blue.x+gap?1:target<blue.x-gap?-1:0;
- jump=ball.x>netX+20&&Math.abs(ball.x-blue.x)<(difficulty==='easy'?55:95)&&ball.y<blue.y-25&&ball.y>blue.y-180&&ball.vy>1&&blue.hitCooldown===0;
- if(difficulty==='easy'&&Math.sin(frame*.08)>.3)jump=false;
+  const onBlueSide=ball.x>netX-30||ball.vx>0&&ball.x>netX-125;
+  // Predict when the descending ball will reach the hittable zone.
+  // Gravity must match the actual ball integration (.35 per frame).
+  const contactY=ground-blue.r*1.8-ball.r;
+  const disc=Math.max(0,ball.vy*ball.vy+2*.35*(contactY-ball.y));
+  const t=Math.max(0,Math.min(40,(-ball.vy+Math.sqrt(disc))/.35));
+  let arrival=ball.x+ball.vx*t;
+  // Reflect forecasts at court edges rather than seeking unreachable x.
+  if(arrival>W-ball.r)arrival=W-ball.r-(arrival-(W-ball.r));
+  if(arrival<netX+ball.r)arrival=netX+ball.r;
+  const contactOffset=offset*(difficulty==='easy'?.55:1);
+  const target=clampBlue(arrival+contactOffset);
+  const tolerance=difficulty==='easy'?44:difficulty==='normal'?15:9;
+  if(onBlueSide){dir=target>blue.x+tolerance?1:target<blue.x-tolerance?-1:0}
+  else{const home=clampBlue(W*.76);dir=home>blue.x+28?1:home<blue.x-28?-1:0}
+  // Rearm only after the ball has left the hitting zone.
+  if(ball.x<netX-70||ball.y<ground-215)cpuJumpArmed=true;
+  const close=Math.abs(blue.x-target)<(difficulty==='easy'?65:37);
+  const approaching=onBlueSide&&ball.vy>-.5&&ball.y<ground-35&&ball.y>ground-270;
+  const sweetSpot=t>3&&t<(difficulty==='hard'?24:19);
+  if(approaching&&close&&sweetSpot&&cpuJumpCooldown===0&&cpuJumpArmed&&blue.y>=ground-.1){
+   jump=true;cpuJumpCooldown=34;cpuJumpArmed=false;
+  }
  }
+
  move(blue,dir,jump,dt);
  if(awaitServe){collide(server==='red'?red:blue);return}
  const lastY=ball.y;
