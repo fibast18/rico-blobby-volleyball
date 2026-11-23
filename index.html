@@ -60,7 +60,7 @@ body.fullscreen .hud .mini{font-size:clamp(10px,1.5vw,13px);padding:5px 7px}
  body.fullscreen .stage{width:100vw!important;height:100dvh!important}
  body.fullscreen .options{display:none!important}
 }
-</style></head><body><main><header><h1>🏐 Rico Blobby Volleyball <small>v2.0.1</small></h1><small>iPhone & smartphone edition</small></header>
+</style></head><body><main><header><h1>🏐 Rico Blobby Volleyball <small>v2.0.2</small></h1><small>iPhone & smartphone edition</small></header>
 <div class="options"><label>CPU <select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><button id="sound">🔊 Sound</button><button id="outsideReset">↻ Restart</button><button id="outsideFull">⛶ Fullscreen</button></div>
 <div id="stage" class="stage"><canvas id="game" width="800" height="500" aria-label="Red and blue blobs playing volleyball on a beach"></canvas>
 <div class="hud"><span id="status" class="mini" style="font-size:12px">Ready</span><div class="buttons"><button id="restart" class="mini" aria-label="Restart the game">↻ Restart</button><button id="fullscreen" class="mini" aria-label="Toggle fullscreen">⛶ Expand</button></div></div>
@@ -74,7 +74,7 @@ const $=id=>document.getElementById(id),stage=$('stage'),canvas=$('game'),ctx=ca
 let W=800,netX=400;const H=500,ground=430,netTop=262,netHalf=7;
 const red={x:195,y:ground,vy:0,vx:0,r:49.45,score:0,jelly:0,jellyV:0,movePhase:0,hitCooldown:0,movePhase:0,hitCooldown:0},blue={x:605,y:ground,vy:0,vx:0,r:49.45,score:0,jelly:0,jellyV:0};
 const ball={x:195,y:260,vx:0,vy:0,r:36};
-let running=false,awaitServe=true,last=0,frame=0,sound=true,audio=null,scoreTimer=0,server='red',serveDelay=0;
+let running=false,awaitServe=true,last=0,frame=0,sound=true,audio=null,scoreTimer=0,server='red',serveDelay=0,rallyTicks=0,lastTouch=null,touchLock=0;
 const pressed={left:false,right:false,jump:false};
 function playTone(freq){if(!sound)return;try{audio??=new(window.AudioContext||window.webkitAudioContext)();const o=audio.createOscillator(),g=audio.createGain();o.frequency.value=freq;o.type='sine';g.gain.setValueAtTime(.035,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+.09);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+.1)}catch{}}
 function sandSound(impact){
@@ -103,7 +103,7 @@ function serveReset(side='red'){
  red.x=W*.245;red.y=ground;red.vx=0;red.vy=0;red.jelly=0;red.jellyV=0;red.movePhase=0;red.hitCooldown=0;
  blue.x=W*.755;blue.y=ground;blue.vx=0;blue.vy=0;blue.jelly=0;blue.jellyV=0;blue.movePhase=0;blue.hitCooldown=0;
  ball.x=side==='red'?red.x:blue.x;
- ball.y=ground-170;ball.vx=0;ball.vy=0;awaitServe=true;scoreTimer=0;serveDelay=0;clearInput();
+ ball.y=ground-170;ball.vx=0;ball.vy=0;awaitServe=true;scoreTimer=0;serveDelay=0;rallyTicks=0;lastTouch=null;touchLock=0;clearInput();
  $('message').textContent=side==='red'?'Jump to serve from your court':'Blue serves next';
 }
 function begin(){if(applyPendingUpdate())return;red.score=0;blue.score=0;frame=0;serveReset('red');running=true;$('overlay').hidden=true;$('status').textContent='Playing'}
@@ -134,36 +134,34 @@ function move(p,dir,jump,dt){
  p.jelly=Math.max(-.32,Math.min(.32,p.jelly));
 }
 function collide(p){
- // Treat the Blobby as a plump ellipse matching its drawn bell shape,
- // expanded by the ball radius. This keeps the visible ball outside the body.
+ // Separation uses a rounded Blobby shape, with no ball/body visual overlap.
  const cx=p.x,cy=p.y-p.r*1.05;
  const rx=p.r*1.02+ball.r+2,ry=p.r*1.08+ball.r+2;
  const dx=ball.x-cx,dy=ball.y-cy;
  const normalized=Math.hypot(dx/rx,dy/ry);
- if(normalized>=1)return;
+ if(normalized>=1)return false;
  const norm=Math.max(normalized,.0001);
- let nx=dx/(rx*rx),ny=dy/(ry*ry);
- const nl=Math.hypot(nx,ny)||1;nx/=nl;ny/=nl;
- // Push ball completely outside the expanded silhouette.
- ball.x=cx+dx/norm*1.012;
- ball.y=cy+dy/norm*1.012;
- if(p.hitCooldown>0)return;
- const relative=ball.vx*nx+(ball.vy-p.vy)*ny;
- if(relative>0.5&&!awaitServe)return;
- p.hitCooldown=6;
- p.jellyV+=Math.max(-.25,Math.min(.25,-ny*.24));
- const striking=p===red,dir=striking?1:-1;
- const speed=Math.max(8,Math.hypot(ball.vx-p.vx,ball.vy-p.vy));
- let vx=nx*speed*.72+p.vx*.44+dir*3.2*(W/800);
- if(awaitServe)vx=dir*Math.max(5,Math.min(9,Math.abs(vx)));
- ball.vx=Math.max(-10*(W/800),Math.min(10*(W/800),vx));
- ball.vy=Math.max(-14.5,Math.min(-6,ny*speed*.8-5.6));
- awaitServe=false;
- playTone(390);
- $('message').textContent='';
+ const nx=dx/(rx*rx),ny=dy/(ry*ry),nl=Math.hypot(nx,ny)||1;
+ ball.x=cx+dx/norm*1.02;ball.y=cy+dy/norm*1.02;
+ const label=p===red?'red':'blue';
+ // Avoid perpetual near-body bouncing: one hit until adequate separation.
+ if(p.hitCooldown>0||(lastTouch===label&&touchLock>0))return false;
+ const incoming=ball.vx*(nx/nl)+(ball.vy-p.vy)*(ny/nl);
+ if(incoming>2&&!awaitServe)return false;
+ p.hitCooldown=19;
+ lastTouch=label;touchLock=36;
+ p.jellyV+=Math.max(-.25,Math.min(.25,-ny/nl*.24));
+ const direction=p===red?1:-1,unit=W/800;
+ // A purposeful shot across the net, not a nearly vertical self-return.
+ const lateral=Math.max(7.6,Math.min(10.2,7.9+Math.abs(p.vx)*.27))*unit;
+ ball.vx=direction*lateral;
+ ball.vy=-Math.max(9,Math.min(12.4,9.7+Math.abs(p.vy)*.12));
+ awaitServe=false;rallyTicks=0;
+ playTone(390);$('message').textContent='';
+ return true;
 }
 function tick(dt){
- frame+=dt;
+ frame+=dt;rallyTicks+=dt;touchLock=Math.max(0,touchLock-dt);
  move(red,(pressed.right?1:0)-(pressed.left?1:0),pressed.jump,dt);
  const difficulty=$('difficulty').value;
  let dir=0,jump=false;
@@ -173,10 +171,10 @@ function tick(dt){
   dir=0;
   jump=serveDelay>34&&blue.y>=ground-.1;
  }else if(!awaitServe){
- const target=ball.x>netX?ball.x+ball.vx*(difficulty==='hard'?10:difficulty==='normal'?6:3):W*.755;
+ const target=ball.x>netX?Math.max(netX+blue.r+netHalf,Math.min(W-blue.r,ball.x+ball.vx*(difficulty==='hard'?8:difficulty==='normal'?5:2))):W*.755;
  const gap=difficulty==='easy'?55:difficulty==='normal'?25:13;
  dir=target>blue.x+gap?1:target<blue.x-gap?-1:0;
- jump=ball.x>netX-20&&Math.abs(ball.x-blue.x)<(difficulty==='easy'?60:105)&&ball.y<blue.y-15&&ball.y>blue.y-190&&ball.vy>=0;
+ jump=ball.x>netX+20&&Math.abs(ball.x-blue.x)<(difficulty==='easy'?55:95)&&ball.y<blue.y-25&&ball.y>blue.y-180&&ball.vy>1&&blue.hitCooldown===0;
  if(difficulty==='easy'&&Math.sin(frame*.08)>.3)jump=false;
  }
  move(blue,dir,jump,dt);
@@ -193,7 +191,9 @@ function tick(dt){
    else{ball.x=netX+netHalf+ball.r;ball.vx=Math.abs(ball.vx)*.88}
  }
  collide(red);collide(blue);
- if(ball.y+ball.r>=ground){sandSound(ball.vy);score(ball.x<netX?'blue':'red')}
+ if(ball.y+ball.r>=ground){sandSound(ball.vy);score(ball.x<netX?'blue':'red');return}
+ // Failsafe for a stalled rally, rather than trapping players in a 0-0 loop.
+ if(rallyTicks>1500){score(ball.x<netX?'blue':'red');return}
 }
 
 /* Cached, layered realistic beach artwork, drawn once per screen size. */
