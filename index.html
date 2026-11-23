@@ -60,8 +60,8 @@ body.fullscreen .hud .mini{font-size:clamp(10px,1.5vw,13px);padding:5px 7px}
  body.fullscreen .stage{width:100vw!important;height:100dvh!important}
  body.fullscreen .options{display:none!important}
 }
-</style></head><body><main><header><h1>🏐 Rico Blobby Volleyball <small>v2.0.4</small></h1><small>iPhone & smartphone edition</small></header>
-<div class="options"><label>CPU <select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><button id="sound">🔊 Sound</button><button id="outsideReset">↻ Restart</button><button id="outsideFull">⛶ Fullscreen</button></div>
+</style></head><body><main><header><h1>🏐 Rico Blobby Volleyball <small>v2.1.0</small></h1><small>iPhone & smartphone edition</small></header>
+<div class="options"><label>CPU <select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><button id="sound">🔊 Sound</button><button id="resetLearning" type="button" title="Reset Blue adaptive learning">🧠 Reset AI</button><span id="aiProgress" aria-live="polite" style="font-size:12px;opacity:.9">Blue AI learning</span><button id="outsideReset">↻ Restart</button><button id="outsideFull">⛶ Fullscreen</button></div>
 <div id="stage" class="stage"><canvas id="game" width="800" height="500" aria-label="Red and blue blobs playing volleyball on a beach"></canvas>
 <div class="hud"><span id="status" class="mini" style="font-size:12px">Ready</span><div class="buttons"><button id="restart" class="mini" aria-label="Restart the game">↻ Restart</button><button id="fullscreen" class="mini" aria-label="Toggle fullscreen">⛶ Expand</button></div></div>
 <div id="message" class="message">Jump to serve from the left court</div>
@@ -76,6 +76,50 @@ const red={x:195,y:ground,vy:0,vx:0,r:49.45,score:0,jelly:0,jellyV:0,movePhase:0
 const ball={x:195,y:260,vx:0,vy:0,r:36};
 let running=false,awaitServe=true,last=0,frame=0,sound=true,audio=null,scoreTimer=0,server='red',serveDelay=0,rallyTicks=0,lastTouch=null,touchLock=0,cpuJumpCooldown=0,cpuJumpArmed=true;
 const pressed={left:false,right:false,jump:false};
+// Bounded online adaptation. Learned preferences are stored only on this device.
+const LEARN_KEY='rico-blobby-blue-ai-v1';
+const freshLearning=()=>({samples:0,returns:0,misses:0,positionBias:0,jumpBias:0});
+const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+function loadLearning(){
+ try{
+  const data=JSON.parse(localStorage.getItem(LEARN_KEY)||'null');
+  if(!data||typeof data!=='object')return freshLearning();
+  return {
+   samples:clamp(Math.floor(Number(data.samples)||0),0,100000),
+   returns:clamp(Math.floor(Number(data.returns)||0),0,100000),
+   misses:clamp(Math.floor(Number(data.misses)||0),0,100000),
+   positionBias:clamp(Number(data.positionBias)||0,-22,22),
+   jumpBias:clamp(Number(data.jumpBias)||0,-5,5)
+  }
+ }catch{return freshLearning()}
+}
+let learning=loadLearning(),cpuAttempt=null,cpuHadTouch=false;
+function saveLearning(){try{localStorage.setItem(LEARN_KEY,JSON.stringify(learning))}catch{}}
+function updateLearningLabel(){
+ const el=$('aiProgress');if(!el)return;
+ el.textContent='🧠 Blue learned: '+learning.samples+' rallies';
+}
+function learnFromRally(result){
+ if(!cpuAttempt)return;
+ // Learn from observed hit/miss outcomes, not from an invented successful action.
+ learning.samples=Math.min(100000,learning.samples+1);
+ if(cpuHadTouch){
+  learning.returns=Math.min(100000,learning.returns+1);
+  // Preserve successful settings, but make small corrections for returns that fail.
+  if(result==='red'){
+   learning.positionBias=clamp(learning.positionBias+(cpuAttempt.offsetError>0?-1.3:1.3),-22,22);
+   learning.jumpBias=clamp(learning.jumpBias+(cpuAttempt.timingError>0?-0.3:.3),-5,5);
+  }
+ }else if(result==='red'){
+  learning.misses=Math.min(100000,learning.misses+1);
+  // A miss is more useful than a win: offset and timing adjust by small bounded increments.
+  learning.positionBias=clamp(learning.positionBias+clamp(cpuAttempt.offsetError*.12,-2.4,2.4),-22,22);
+  learning.jumpBias=clamp(learning.jumpBias+clamp(cpuAttempt.timingError*.08,-.5,.5),-5,5);
+ }
+ saveLearning();updateLearningLabel();
+ cpuAttempt=null;cpuHadTouch=false;
+}
+
 function playTone(freq){if(!sound)return;try{audio??=new(window.AudioContext||window.webkitAudioContext)();const o=audio.createOscillator(),g=audio.createGain();o.frequency.value=freq;o.type='sine';g.gain.setValueAtTime(.035,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+.09);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+.1)}catch{}}
 function sandSound(impact){
  if(!sound)return;
@@ -99,17 +143,18 @@ function sandSound(impact){
 function wakeAudio(){try{audio??=new(window.AudioContext||window.webkitAudioContext)();if(audio.state==='suspended')audio.resume().catch(()=>{})}catch{}}
 function clearInput(){for(const k in pressed)pressed[k]=false;document.querySelectorAll('.control').forEach(b=>b.classList.remove('pressed'))}
 function serveReset(side='red'){
- server=side;
+ server=side;cpuAttempt=null;cpuHadTouch=false;
  red.x=W*.245;red.y=ground;red.vx=0;red.vy=0;red.jelly=0;red.jellyV=0;red.movePhase=0;red.hitCooldown=0;
  blue.x=W*.755;blue.y=ground;blue.vx=0;blue.vy=0;blue.jelly=0;blue.jellyV=0;blue.movePhase=0;blue.hitCooldown=0;
  ball.x=side==='red'?red.x:blue.x;
  ball.y=ground-170;ball.vx=0;ball.vy=0;awaitServe=true;scoreTimer=0;serveDelay=0;rallyTicks=0;lastTouch=null;touchLock=0;cpuJumpCooldown=0;cpuJumpArmed=true;clearInput();
  $('message').textContent=side==='red'?'Jump to serve from your court':'Blue serves next';
 }
-function begin(){if(applyPendingUpdate())return;red.score=0;blue.score=0;frame=0;serveReset('red');running=true;$('overlay').hidden=true;$('status').textContent='Playing'}
+function begin(){if(applyPendingUpdate())return;updateLearningLabel();red.score=0;blue.score=0;frame=0;serveReset('red');running=true;$('overlay').hidden=true;$('status').textContent='Playing'}
 function restart(){if(applyPendingUpdate())return;begin()}
 function finish(){running=false;clearInput();$('title').textContent=(red.score>=15?'Red wins! 🎉':'Blue wins!');$('detail').textContent='Final score '+red.score+' : '+blue.score+'. Tap Play Again for a fresh match.';$('start').textContent='↻ Play Again';$('overlay').hidden=false;$('status').textContent='Match over'}
 function score(side){
+ learnFromRally(side);
  if(side==='red')red.score++;else blue.score++;
  if(red.score>=15||blue.score>=15){finish();return}
  serveReset(side);
@@ -154,6 +199,7 @@ function collide(p){
  const approach=relX*nx+relY*ny;
  if(approach>0.35&&!awaitServe)return false;
  p.hitCooldown=14;lastTouch=label;touchLock=22;
+ if(p===blue&&!awaitServe)cpuHadTouch=true;
  p.jellyV+=Math.max(-.25,Math.min(.25,-ny*.24));
  // Reflect across the local surface normal. This makes wrong-side and
  // glancing hits naturally stay on the hitter's side of the court.
@@ -177,6 +223,7 @@ function tick(dt){
  move(red,(pressed.right?1:0)-(pressed.left?1:0),pressed.jump,dt);
  const difficulty=$('difficulty').value;
  let dir=0,jump=false;
+ const adaptiveStrength=difficulty==='easy'?.25:difficulty==='normal'?.65:1;
  cpuJumpCooldown=Math.max(0,cpuJumpCooldown-dt);
  const blueMin=netX+netHalf+blue.r,blueMax=W-blue.r;
  const offset=(blue.r+ball.r)*.59; // Off-center: contact the LEFT side of Blue to return left.
@@ -200,7 +247,7 @@ function tick(dt){
   // Reflect forecasts at court edges rather than seeking unreachable x.
   if(arrival>W-ball.r)arrival=W-ball.r-(arrival-(W-ball.r));
   if(arrival<netX+ball.r)arrival=netX+ball.r;
-  const contactOffset=offset*(difficulty==='easy'?.55:1);
+  const contactOffset=offset*(difficulty==='easy'?.55:1)+learning.positionBias*adaptiveStrength;
   const target=clampBlue(arrival+contactOffset);
   const tolerance=difficulty==='easy'?44:difficulty==='normal'?15:9;
   if(onBlueSide){dir=target>blue.x+tolerance?1:target<blue.x-tolerance?-1:0}
@@ -209,12 +256,18 @@ function tick(dt){
   if(ball.x<netX-70||ball.y<ground-215)cpuJumpArmed=true;
   const close=Math.abs(blue.x-target)<(difficulty==='easy'?65:37);
   const approaching=onBlueSide&&ball.vy>-.5&&ball.y<ground-35&&ball.y>ground-270;
-  const sweetSpot=t>3&&t<(difficulty==='hard'?24:19);
+  const sweetSpot=t>3&&t<(difficulty==='hard'?24:19)+learning.jumpBias*adaptiveStrength;
   if(approaching&&close&&sweetSpot&&cpuJumpCooldown===0&&cpuJumpArmed&&blue.y>=ground-.1){
    jump=true;cpuJumpCooldown=34;cpuJumpArmed=false;
+   cpuAttempt={offsetError:clamp(arrival+offset-blue.x,-60,60),timingError:clamp(t-12,-15,15)};cpuHadTouch=false;
   }
  }
 
+ // Record an observable failed interception if Blue does not reach a playable incoming ball.
+ if(!awaitServe&&!cpuAttempt&&ball.x>netX+ball.r&&ball.vy>1&&ball.y>ground-160&&ball.y<ground-90){
+   cpuAttempt={offsetError:clamp(ball.x+offset-blue.x,-60,60),timingError:clamp((ground-ball.y)/Math.max(1,ball.vy)-10,-15,15)};
+   cpuHadTouch=false;
+ }
  move(blue,dir,jump,dt);
  if(awaitServe){collide(server==='red'?red:blue);return}
  const lastY=ball.y;
@@ -430,6 +483,8 @@ stage.addEventListener('touchmove',e=>{if(e.target.closest('[data-control]'))e.p
 window.addEventListener('blur',clearInput);document.addEventListener('visibilitychange',()=>{if(document.hidden)clearInput()});
 $('start').onclick=()=>{wakeAudio();begin()};$('restart').onclick=restart;$('outsideReset').onclick=restart;
 $('sound').onclick=()=>{sound=!sound;$('sound').textContent=sound?'🔊 Sound':'🔇 Muted'};
+$('resetLearning').onclick=()=>{learning=freshLearning();saveLearning();cpuAttempt=null;cpuHadTouch=false;updateLearningLabel();$('status').textContent='AI learning reset'};
+updateLearningLabel();
 function updateFull(){const active=document.body.classList.contains('fullscreen');$('fullscreen').textContent=active?'✕ Exit':'⛶ Expand';$('outsideFull').textContent=active?'✕ Exit':'⛶ Fullscreen'}
 async function toggleFull(){if(document.body.classList.contains('fullscreen')){document.body.classList.remove('fullscreen');if(document.fullscreenElement)try{await document.exitFullscreen()}catch{};updateFull();return}document.body.classList.add('fullscreen');if(stage.requestFullscreen)try{await stage.requestFullscreen({navigationUI:'hide'})}catch{};updateFull()}
 $('fullscreen').onclick=toggleFull;$('outsideFull').onclick=toggleFull;
