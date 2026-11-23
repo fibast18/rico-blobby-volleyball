@@ -41,7 +41,26 @@ body.fullscreen .hud .mini{font-size:clamp(10px,1.5vw,13px);padding:5px 7px}
 #controls .arrow-left{transform:rotate(-90deg)}
 #controls .arrow-right{transform:rotate(90deg)}
 #controls .arrow-up{transform:none}
-</style></head><body><main><header><h1>🏐 Rico Blobby Volleyball <small>v2.0.0</small></h1><small>iPhone & smartphone edition</small></header>
+
+/* iPhone portrait: keep the title and settings clear of the Dynamic Island / status bar. */
+@media (orientation:portrait) and (max-width:650px){
+ html,body{min-height:100dvh}
+ main{padding: max(65px,calc(env(safe-area-inset-top) + 18px)) 10px max(24px,env(safe-area-inset-bottom))}
+ header{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+ header h1{font-size:17px}
+ header>small{font-size:11px}
+ .options{display:flex!important;position:relative;z-index:10;gap:8px;margin:4px 0 14px}
+ .options button,.options select{font-size:13px;padding:10px 11px;min-height:43px}
+ .stage{width:100%;aspect-ratio:8/5;border-radius:13px}
+ .landscape-note{font-size:14px;margin:15px 0 9px}
+ .note{line-height:1.55}
+ .overlay .dialog{padding:16px 14px}
+ .overlay .dialog p{font-size:13px}
+ body.fullscreen main{padding:0}
+ body.fullscreen .stage{width:100vw!important;height:100dvh!important}
+ body.fullscreen .options{display:none!important}
+}
+</style></head><body><main><header><h1>🏐 Rico Blobby Volleyball <small>v2.0.1</small></h1><small>iPhone & smartphone edition</small></header>
 <div class="options"><label>CPU <select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><button id="sound">🔊 Sound</button><button id="outsideReset">↻ Restart</button><button id="outsideFull">⛶ Fullscreen</button></div>
 <div id="stage" class="stage"><canvas id="game" width="800" height="500" aria-label="Red and blue blobs playing volleyball on a beach"></canvas>
 <div class="hud"><span id="status" class="mini" style="font-size:12px">Ready</span><div class="buttons"><button id="restart" class="mini" aria-label="Restart the game">↻ Restart</button><button id="fullscreen" class="mini" aria-label="Toggle fullscreen">⛶ Expand</button></div></div>
@@ -138,7 +157,7 @@ function collide(p){
  let vx=nx*speed*.72+p.vx*.44+dir*3.2*(W/800);
  if(awaitServe)vx=dir*Math.max(5,Math.min(9,Math.abs(vx)));
  ball.vx=Math.max(-10*(W/800),Math.min(10*(W/800),vx));
- ball.vy=Math.max(-17,Math.min(-6,ny*speed*.9-6));
+ ball.vy=Math.max(-14.5,Math.min(-6,ny*speed*.8-5.6));
  awaitServe=false;
  playTone(390);
  $('message').textContent='';
@@ -163,7 +182,8 @@ function tick(dt){
  move(blue,dir,jump,dt);
  if(awaitServe){collide(server==='red'?red:blue);return}
  const lastY=ball.y;
- ball.vy+=.3*dt;ball.x+=ball.vx*dt;ball.y+=ball.vy*dt;
+ ball.vy+=.35*dt;ball.x+=ball.vx*dt;ball.y+=ball.vy*dt;
+ if(!Number.isFinite(ball.x)||!Number.isFinite(ball.y)||Math.abs(ball.y)>5000){serveReset(server);return}
  if(ball.x<ball.r){ball.x=ball.r;ball.vx=Math.abs(ball.vx)*.9}
  if(ball.x>W-ball.r){ball.x=W-ball.r;ball.vx=-Math.abs(ball.vx)*.9}
  // Open sky: the ball can rise beyond the visible court and return under gravity.
@@ -336,13 +356,15 @@ function draw(){
  const shad=ctx.createRadialGradient(ball.x,ground+10,0,ball.x,ground+10,Math.max(10,ball.r*1.5));
  shad.addColorStop(0,'#33332b75');shad.addColorStop(1,'#33332b00');
  ctx.fillStyle=shad;ctx.beginPath();ctx.ellipse(ball.x,ground+9,Math.max(12,ball.r*1.5-(ground-ball.y)*.045),8,0,0,7);ctx.fill();
- if(ball.y+ball.r<0){
+ drawBall();
+ if(ball.y<ball.r+8){
   // Locate the ball while it is above the visible sky.
-  const x=Math.max(26,Math.min(W-26,ball.x)),y=108;
+  const x=Math.max(26,Math.min(W-26,ball.x)),y=125;
   ctx.save();ctx.shadowColor='#102d4bb0';ctx.shadowBlur=8;
   ctx.fillStyle='#ffe067';ctx.strokeStyle='#5e4314';ctx.lineWidth=2;
   ctx.beginPath();ctx.moveTo(x,y-23);ctx.lineTo(x-16,y-4);ctx.lineTo(x-6,y-4);ctx.lineTo(x-6,y+13);ctx.lineTo(x+6,y+13);ctx.lineTo(x+6,y-4);ctx.lineTo(x+16,y-4);ctx.closePath();
   ctx.fill();ctx.stroke();
+  ctx.shadowBlur=0;ctx.textAlign='center';ctx.font='bold 15px system-ui';ctx.fillStyle='#fffbe2';ctx.strokeStyle='#233b4e';ctx.lineWidth=3;ctx.strokeText('BALL',x,y+31);ctx.fillText('BALL',x,y+31);
   ctx.restore();
  }
  ctx.textAlign='center';ctx.font='bold 19px system-ui';ctx.lineWidth=3;
