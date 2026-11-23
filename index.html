@@ -74,14 +74,41 @@ body.fullscreen .controls{
 }
 /* The transparent lower strip belongs to the system gesture, not a game button. */
 body.fullscreen #controls .control{touch-action:none}
-</style></head><body><main><header><h1>🏐 Rico Blobby Volleyball <small>v2.1.3</small></h1><small>iPhone & smartphone edition</small></header>
+
+/* v2.1.4: The entire right half of the court is a transparent jump surface.
+   HUD buttons remain above it; the iOS Home gesture area stays clear. */
+.stage .hud{z-index:5}
+#controls{height:100%!important;bottom:0!important;z-index:4}
+#controls [data-control=left],#controls [data-control=right]{
+  height:19%!important;bottom:0!important;width:25%!important;
+}
+#controls [data-control=jump]{
+  left:50%!important;right:0!important;top:0!important;bottom:0!important;
+  width:50%!important;height:100%!important;
+  padding:0!important;margin:0!important;
+  border:0!important;background:transparent!important;box-shadow:none!important;
+  color:transparent!important;outline-offset:-3px;
+}
+#controls [data-control=jump].pressed{background:transparent!important}
+body.fullscreen #controls{height:100%!important;bottom:0!important}
+body.fullscreen #controls [data-control=left],
+body.fullscreen #controls [data-control=right]{
+  height:clamp(58px,16dvh,98px)!important;
+  bottom:max(34px,env(safe-area-inset-bottom,0px))!important;
+}
+body.fullscreen #controls [data-control=jump]{
+  top:0!important;
+  bottom:max(34px,env(safe-area-inset-bottom,0px))!important;
+  height:auto!important;
+}
+</style></head><body><main><header><h1>🏐 Rico Blobby Volleyball <small>v2.1.4</small></h1><small>iPhone & smartphone edition</small></header>
 <div class="options"><label>CPU <select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><button id="sound">🔊 Sound</button><button id="resetLearning" type="button" title="Reset Blue adaptive learning">🧠 Reset AI</button><span id="aiProgress" aria-live="polite" style="font-size:12px;opacity:.9">Blue AI learning</span><button id="outsideReset">↻ Restart</button><button id="outsideFull">⛶ Fullscreen</button></div>
 <div id="stage" class="stage"><canvas id="game" width="800" height="500" aria-label="Red and blue blobs playing volleyball on a beach"></canvas>
 <div class="hud"><span id="status" class="mini" style="font-size:12px">Ready</span><div class="buttons"><button id="restart" class="mini" aria-label="Restart the game">↻ Restart</button><button id="fullscreen" class="mini" aria-label="Toggle fullscreen">⛶ Expand</button></div></div>
 <div id="message" class="message">Jump to serve from the left court</div>
-<div class="controls" id="controls"><button class="control" type="button" data-control="left" aria-label="Move left"><svg class="arrow-icon arrow-left" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2 2 12h6v10h8V12h6L12 2z"/></svg></button><button class="control" type="button" data-control="right" aria-label="Move right"><svg class="arrow-icon arrow-right" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2 2 12h6v10h8V12h6L12 2z"/></svg></button><button class="control" type="button" data-control="jump" aria-label="Jump and serve"><svg class="arrow-icon arrow-up" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2 2 12h6v10h8V12h6L12 2z"/></svg></button></div>
-<div id="overlay" class="overlay"><div class="dialog"><h2 id="title">Beach volleyball!</h2><p id="detail">The ball starts above Red on your side. Tap Jump to hit it. Use the two large movement areas on the left and Jump on the far right. First to 15 wins!</p><button id="start">▶ Play</button></div></div>
-</div><div class="landscape-note">📱 Rotate your iPhone sideways for easier play.</div><p class="note">Smartphone touch controls: the left half moves your blob. The far-right quarter jumps. Restart and Fullscreen stay available inside the game.</p><footer class="footer">Original mobile arcade game · Developed by: Engr. Rico J. Pono</footer>
+<div class="controls" id="controls"><button class="control" type="button" data-control="left" aria-label="Move left"><svg class="arrow-icon arrow-left" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2 2 12h6v10h8V12h6L12 2z"/></svg></button><button class="control" type="button" data-control="right" aria-label="Move right"><svg class="arrow-icon arrow-right" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2 2 12h6v10h8V12h6L12 2z"/></svg></button><button class="control" type="button" data-control="jump" aria-label="Jump anywhere on the right half of the court"></button></div>
+<div id="overlay" class="overlay"><div class="dialog"><h2 id="title">Beach volleyball!</h2><p id="detail">The ball starts above Red. Touch anywhere on the right half of the court to jump and serve. Use the two movement arrows on the lower-left. First to 15 wins!</p><button id="start">▶ Play</button></div></div>
+</div><div class="landscape-note">📱 Rotate your iPhone sideways for easier play.</div><p class="note">Smartphone touch controls: use the lower-left arrows to move Red. Tap anywhere on the right half of the court to jump. Restart and Fullscreen remain accessible.</p><footer class="footer">Original mobile arcade game · Developed by: Engr. Rico J. Pono</footer>
 <script>
 (()=>{'use strict';
 const $=id=>document.getElementById(id),stage=$('stage'),canvas=$('game'),ctx=canvas.getContext('2d');
@@ -232,6 +259,36 @@ function collide(p){
  playTone(390);$('message').textContent='';
  return true;
 }
+// Ball-versus-post collision: closest-point normal on a rounded corner.
+// The same function is used by actual gameplay and CPU trajectory simulation.
+function resolveNetCollision(body){
+ const left=netX-netHalf-1,right=netX+netHalf+1,top=netTop-4;
+ const qx=Math.max(left,Math.min(right,body.x));
+ const qy=Math.max(top,Math.min(ground,body.y));
+ const dx=body.x-qx,dy=body.y-qy;
+ let d=Math.hypot(dx,dy);
+ if(d>=body.r)return false;
+ let nx=0,ny=0;
+ if(d>1e-6){nx=dx/d;ny=dy/d;}
+ else{
+  // Rarely, a fast-moving ball may penetrate the post: take the
+  // shortest valid exit rather than forcing an upward rebound.
+  const dl=Math.abs(body.x-left),dr=Math.abs(right-body.x),dt=Math.abs(body.y-top);
+  if(dt<=dl&&dt<=dr){ny=-1}
+  else if(dl<=dr){nx=-1}
+  else{nx=1}
+  d=0;
+ }
+ const correction=body.r-d+.05;
+ body.x+=nx*correction;body.y+=ny*correction;
+ const incoming=body.vx*nx+body.vy*ny;
+ if(incoming<0){
+  const elasticity=.88;
+  body.vx-=(1+elasticity)*incoming*nx;
+  body.vy-=(1+elasticity)*incoming*ny;
+ }
+ return true;
+}
 function tick(dt){
  frame+=dt;rallyTicks+=dt;touchLock=Math.max(0,touchLock-dt);
  move(red,(pressed.right?1:0)-(pressed.left?1:0),pressed.jump,dt);
@@ -301,19 +358,17 @@ function tick(dt){
   const collisionY=blue.r*1.08+ball.r+2;
   const travelSpeed=6.6*(W/800);
   const samples=[];
-  let fx=ball.x,fy=ball.y,fvx=ball.vx,fvy=ball.vy;
+  const simulated={x:ball.x,y:ball.y,vx:ball.vx,vy:ball.vy,r:ball.r};
   for(let n=1;n<=48;n++){
-    const oldY=fy;
-    fvy+=gravity;fx+=fvx;fy+=fvy;
-    if(fx<ball.r){fx=ball.r;fvx=Math.abs(fvx)*.9}
-    if(fx>W-ball.r){fx=W-ball.r;fvx=-Math.abs(fvx)*.9}
-    if(fy+ball.r>netTop&&fy-ball.r<ground&&Math.abs(fx-netX)<ball.r+netHalf){
-      if(oldY+ball.r<=netTop&&fvy>0){fy=netTop-ball.r;fvy=-Math.abs(fvy)*.82}
-      else if(fx<netX){fx=netX-netHalf-ball.r;fvx=-Math.abs(fvx)*.88}
-      else{fx=netX+netHalf+ball.r;fvx=Math.abs(fvx)*.88}
+    simulated.vy+=gravity;
+    simulated.x+=simulated.vx;simulated.y+=simulated.vy;
+    if(simulated.x<ball.r){simulated.x=ball.r;simulated.vx=Math.abs(simulated.vx)*.9}
+    if(simulated.x>W-ball.r){simulated.x=W-ball.r;simulated.vx=-Math.abs(simulated.vx)*.9}
+    resolveNetCollision(simulated); // Match real net contact angle in CPU planning.
+    if(simulated.y+ball.r>=ground)break;
+    if(simulated.x>netX-ball.r&&simulated.vx>=-.5){
+      samples.push({t:n,x:simulated.x,y:simulated.y});
     }
-    if(fy+ball.r>=ground)break;
-    if(fx>netX-ball.r&&fvx>=-.5)samples.push({t:n,x:fx,y:fy});
   }
   // The estimator only decides WHEN and WHERE Blue jumps. All collisions
   // continue to use the exact same physics as the human-controlled Red.
@@ -374,17 +429,12 @@ function tick(dt){
  }
  move(blue,dir,jump,dt);
  if(awaitServe){collide(server==='red'?red:blue);return}
- const lastY=ball.y;
  ball.vy+=.35*dt;ball.x+=ball.vx*dt;ball.y+=ball.vy*dt;
  if(!Number.isFinite(ball.x)||!Number.isFinite(ball.y)||Math.abs(ball.y)>5000){serveReset(server);return}
  if(ball.x<ball.r){ball.x=ball.r;ball.vx=Math.abs(ball.vx)*.9}
  if(ball.x>W-ball.r){ball.x=W-ball.r;ball.vx=-Math.abs(ball.vx)*.9}
  // Open sky: the ball can rise beyond the visible court and return under gravity.
- if(ball.y+ball.r>netTop&&ball.y-ball.r<ground&&Math.abs(ball.x-netX)<ball.r+netHalf){
-   if(lastY+ball.r<=netTop&&ball.vy>0){ball.y=netTop-ball.r;ball.vy=-Math.abs(ball.vy)*.82}
-   else if(ball.x<netX){ball.x=netX-netHalf-ball.r;ball.vx=-Math.abs(ball.vx)*.88}
-   else{ball.x=netX+netHalf+ball.r;ball.vx=Math.abs(ball.vx)*.88}
- }
+ resolveNetCollision(ball);
  collide(red);collide(blue);
  if(ball.y+ball.r>=ground){sandSound(ball.vy);score(ball.x<netX?'blue':'red');return}
  // Failsafe for a stalled rally, rather than trapping players in a 0-0 loop.
@@ -544,7 +594,12 @@ function draw(){
  const post=ctx.createLinearGradient(netX-9,0,netX+11,0);
  post.addColorStop(0,'#858f95');post.addColorStop(.3,'#f9fafb');post.addColorStop(.65,'#bec7cc');post.addColorStop(1,'#626d71');
  ctx.fillStyle=post;ctx.fillRect(netX-netHalf,netTop,netHalf*2,H-netTop);
- ctx.fillStyle='#f6f8f8';ctx.fillRect(netX-10,netTop-3,20,7);
+ ctx.fillStyle='#f6f8f8';ctx.beginPath();
+ ctx.moveTo(netX-10,netTop+5);ctx.lineTo(netX-10,netTop-1);
+ ctx.quadraticCurveTo(netX-10,netTop-5,netX-6,netTop-5);
+ ctx.lineTo(netX+6,netTop-5);
+ ctx.quadraticCurveTo(netX+10,netTop-5,netX+10,netTop-1);
+ ctx.lineTo(netX+10,netTop+5);ctx.closePath();ctx.fill();
  ctx.strokeStyle='#8c9c9e75';ctx.lineWidth=1;
  for(let y=netTop+16;y<H;y+=17){ctx.beginPath();ctx.moveTo(netX-netHalf,y);ctx.lineTo(netX+netHalf,y);ctx.stroke()}
  drawBlob(red,'red');drawBlob(blue,'blue');
