@@ -60,7 +60,7 @@ body.fullscreen .hud .mini{font-size:clamp(10px,1.5vw,13px);padding:5px 7px}
  body.fullscreen .stage{width:100vw!important;height:100dvh!important}
  body.fullscreen .options{display:none!important}
 }
-</style></head><body><main><header><h1>🏐 Rico Blobby Volleyball <small>v2.1.1</small></h1><small>iPhone & smartphone edition</small></header>
+</style></head><body><main><header><h1>🏐 Rico Blobby Volleyball <small>v2.1.2</small></h1><small>iPhone & smartphone edition</small></header>
 <div class="options"><label>CPU <select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><button id="sound">🔊 Sound</button><button id="resetLearning" type="button" title="Reset Blue adaptive learning">🧠 Reset AI</button><span id="aiProgress" aria-live="polite" style="font-size:12px;opacity:.9">Blue AI learning</span><button id="outsideReset">↻ Restart</button><button id="outsideFull">⛶ Fullscreen</button></div>
 <div id="stage" class="stage"><canvas id="game" width="800" height="500" aria-label="Red and blue blobs playing volleyball on a beach"></canvas>
 <div class="hud"><span id="status" class="mini" style="font-size:12px">Ready</span><div class="buttons"><button id="restart" class="mini" aria-label="Restart the game">↻ Restart</button><button id="fullscreen" class="mini" aria-label="Toggle fullscreen">⛶ Expand</button></div></div>
@@ -237,53 +237,65 @@ function tick(dt){
    jump=true;cpuJumpCooldown=30;cpuJumpArmed=false;
   }
  }else if(!awaitServe){
-  // Defend first, aim second. Predict the ball's horizontal location at
-  // several playable heights, including low shots that barely cross the net.
-  const movingTowardBlue=ball.vx>0&&ball.x>netX-230;
-  const onBlueSide=ball.x>netX-ball.r||movingTowardBlue;
+  // Intercept using the ball's actual approach. Previously Blue jumped
+  // while a short near-net ball was already falling below its airborne body.
   const gravity=.35;
-  const hitHeight=ground-blue.r*1.5-ball.r*.5;
-  const timeToHeight=y=>{
-   const d=ball.vy*ball.vy+2*gravity*(y-ball.y);
-   if(d<0)return 40;
-   return clamp((-ball.vy+Math.sqrt(d))/gravity,0,65);
+  const onBlueSide=ball.x>=netX-ball.r||(ball.vx>0&&ball.x>netX-260);
+  const timeToY=y=>{
+    const disc=ball.vy*ball.vy+2*gravity*(y-ball.y);
+    if(disc<0)return 65;
+    return clamp((-ball.vy+Math.sqrt(disc))/gravity,0,65);
   };
-  const t=timeToHeight(hitHeight);
-  const landingT=timeToHeight(ground-ball.r);
+  // A standing blob can already contact a ball just above ground.
+  const standingContactY=ground-blue.r*1.05-ball.r;
+  const contactT=timeToY(standingContactY);
+  const groundT=timeToY(ground-ball.r);
   const reflectWall=x=>{
-   const lo=ball.r,hi=W-ball.r,span=hi-lo;
-   let value=(x-lo)%(2*span);
-   if(value<0)value+=2*span;
-   return lo+(value>span?2*span-value:value);
+    const lo=ball.r,hi=W-ball.r,span=hi-lo;
+    let u=(x-lo)%(span*2);if(u<0)u+=span*2;
+    return lo+(u>span?span*2-u:u);
   };
-  let projected=reflectWall(ball.x+ball.vx*t);
-  let landing=reflectWall(ball.x+ball.vx*landingT);
-  // The center post blocks a low trajectory: guard just behind the net.
-  projected=clamp(projected,blueMin,blueMax);
-  landing=clamp(landing,blueMin,blueMax);
-  const urgentNearNet=landing<netX+blue.r*2.9||projected<netX+blue.r*2.6;
-  const safeOffset=urgentNearNet?6:clamp(offset*.40+learning.positionBias*adaptiveStrength,-2,33);
-  // When a ball lands close to the net, moving underneath it is more
-  // important than trying for an ideal angled return.
-  const target=clampBlue((t<14?landing:projected)+safeOffset);
-  const tolerance=difficulty==='easy'?26:difficulty==='normal'?11:7;
-  if(onBlueSide){dir=target>blue.x+tolerance?1:target<blue.x-tolerance?-1:0}
-  else{
-   // Start closer to the middle / net rather than camping at the far right.
-   const home=clampBlue(netX+(W-netX)*.41);
-   dir=home>blue.x+18?1:home<blue.x-18?-1:0;
+  let contactX=reflectWall(ball.x+ball.vx*contactT);
+  let groundX=reflectWall(ball.x+ball.vx*groundT);
+  // The net blocks low balls, so avoid forecasting that a ball can
+  // travel through the solid net below its top.
+  if(ball.x<netX&&ball.vx>0&&ball.y+ball.r>netTop-20){
+    contactX=netX+ball.r+netHalf;
+    groundX=contactX;
   }
-  // A single anticipatory jump; do not keep tapping jump at the same place.
-  if(ball.x<netX-95||ball.y<ground-265)cpuJumpArmed=true;
-  const reachable=onBlueSide&&Math.abs(target-blue.x)<(difficulty==='easy'?78:110);
-  const descending=ball.vy>0;
-  const ballInJumpRange=ball.y<ground-55&&ball.y>ground-290;
-  const jumpIn=clamp(13+learning.jumpBias*adaptiveStrength,8,19);
-  const immediate=ball.x>netX&&Math.abs(ball.x-blue.x)<blue.r+ball.r+12&&ball.y<ground-92&&ball.y>ground-220&&ball.vy>2;
-  if(reachable&&descending&&ballInJumpRange&&(t<=jumpIn||immediate)&&cpuJumpCooldown===0&&cpuJumpArmed&&blue.y>=ground-.1){
-   jump=true;cpuJumpCooldown=31;cpuJumpArmed=false;
-   cpuAttempt={offsetError:clamp(landing-blue.x,-60,60),timingError:clamp(t-12,-15,15)};
-   cpuHadTouch=false;
+  const nearNet=contactX<netX+blue.r*3||groundX<netX+blue.r*3;
+  const defensiveX=nearNet?Math.min(contactX,groundX):contactX;
+  // Aim for a playable interception first; angling is optional only
+  // once there is adequate time and distance from the net.
+  const positionOffset=nearNet?0:clamp((blue.r+ball.r)*.2+learning.positionBias*adaptiveStrength,-8,24);
+  const target=clampBlue(defensiveX+positionOffset);
+  const tolerance=difficulty==='easy'?20:difficulty==='normal'?8:5;
+  if(onBlueSide){
+    dir=target>blue.x+tolerance?1:target<blue.x-tolerance?-1:0;
+  }else{
+    // Stand close enough to cover a shot landing just beyond the net.
+    const home=clampBlue(netX+blue.r+39);
+    dir=home>blue.x+18?1:home<blue.x-18?-1:0;
+  }
+  if(ball.x<netX-85||ball.y<ground-250)cpuJumpArmed=true;
+  // Keep both feet on the sand for low/fast incoming shots. Jump only
+  // if ball is HIGH enough that a grounded blob cannot reach it.
+  const predictedY=ball.y+ball.vy*8+.5*gravity*64;
+  const ballTooHighForStanding=predictedY<ground-blue.r*2.2-ball.r;
+  const closeEnough=Math.abs(target-blue.x)<(difficulty==='easy'?70:95);
+  const jumpWindow=clamp(10+learning.jumpBias*adaptiveStrength,7,15);
+  const canJump=onBlueSide&&ball.vy>0&&ballTooHighForStanding&&
+    ball.y<ground-150&&ball.y>ground-295&&contactT<jumpWindow&&contactT>2;
+  if(canJump&&closeEnough&&cpuJumpCooldown===0&&cpuJumpArmed&&blue.y>=ground-.1){
+    jump=true;cpuJumpCooldown=38;cpuJumpArmed=false;
+    cpuAttempt={offsetError:clamp(contactX-blue.x,-60,60),timingError:clamp(contactT-10,-15,15)};
+    cpuHadTouch=false;
+  }
+  // Log a near-net defensive attempt even if the sensible action is
+  // staying grounded; learning then receives the missed-shot result.
+  if(onBlueSide&&nearNet&&!cpuAttempt&&ball.vy>0&&groundT<22){
+    cpuAttempt={offsetError:clamp(groundX-blue.x,-60,60),timingError:clamp(groundT-12,-15,15)};
+    cpuHadTouch=false;
   }
  }
 
