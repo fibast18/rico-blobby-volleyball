@@ -351,6 +351,12 @@ function tick(dt){
     cpuAttempt={offsetError:cpuJumpPlan.offsetError,timingError:cpuJumpPlan.timingError};
     cpuHadTouch=false;cpuJumpPlan=null;
   }
+  // Steer toward the planned aerial contact immediately; don't keep chasing
+  // the later ground position while preparing to jump.
+  if(cpuJumpPlan&&onBlueSide){
+    const aim=clampBlue(cpuJumpPlan.target);
+    dir=aim>blue.x+tolerance?1:aim<blue.x-tolerance?-1:0;
+  }
   // Only rearm after a new incoming volley, not while Blue is midair.
   if(ball.x<netX-90&&ball.vx<=0&&blue.y>=ground-.1)cpuJumpArmed=true;
   // Log a near-net defensive attempt even if the sensible action is
