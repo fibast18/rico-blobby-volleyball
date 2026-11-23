@@ -44,10 +44,20 @@
 .frame>.controls:has(#bluePad[hidden])>div:first-child .pad{width:100%!important;height:100%;display:flex;gap:0!important;pointer-events:none}
 .frame>.controls:has(#bluePad[hidden]) [data-key="left"],.frame>.controls:has(#bluePad[hidden]) [data-key="right"]{position:relative!important;left:auto!important;right:auto!important;bottom:auto!important;flex:0 0 50%;width:50%;max-width:none;min-width:0!important;height:100%;min-height:0!important;border-radius:0!important;margin:0!important;pointer-events:auto}
 .frame>.controls:has(#bluePad[hidden]) [data-key="jump"]{position:absolute!important;left:auto!important;right:0!important;bottom:0!important;width:25%!important;max-width:none!important;min-width:0!important;height:100%!important;min-height:0!important;border-radius:0!important;margin:0!important;pointer-events:auto}
-.frame>.controls:has(#bluePad[hidden]) .touch{background:#b4c96a75!important;border:1px solid #f8ffe85a!important;box-shadow:inset 0 0 22px #dbec9450!important;font-size:clamp(25px,6vw,48px)!important;color:#fff8e1!important}
-.frame>.controls:has(#bluePad[hidden]) .touch.down{background:#f9ca4ab3!important}
+.frame>.controls:has(#bluePad[hidden]) .touch{background:#b4c96a14!important;border:1px solid #f8ffe81c!important;box-shadow:none!important;font-size:clamp(25px,6vw,48px)!important;color:#fff8e16b!important;text-shadow:none!important}
+.frame>.controls:has(#bluePad[hidden]) .touch.down{background:#f9ca4a30!important}
 @media(max-width:680px){.frame>.controls:has(#bluePad[hidden]){height:28%}}
-</style></head><body><main><header><h1>🏐 Rico Blobby Volleyball <small style="font-size:.45em">v1.2.0</small></h1><span id="status" aria-live="polite">Ready to play</span></header>
+
+/* Clear the court view: controls are almost invisible but retain full tap targets. */
+.frame>.controls:not(:has(#bluePad[hidden])) .touch{
+ background:#b4c96a14!important;
+ border:1px solid #f8ffe81c!important;
+ box-shadow:none!important;
+ color:#fff8e16b!important;
+ text-shadow:none!important;
+}
+.frame>.controls:not(:has(#bluePad[hidden])) .touch.down{background:#f9ca4a30!important}
+</style></head><body><main><header><h1>🏐 Rico Blobby Volleyball <small style="font-size:.45em">v1.2.1</small></h1><span id="status" aria-live="polite">Ready to play</span></header>
 <div class="settings"><label>Mode <select id="mode"><option value="ai">1 player vs CPU</option><option value="local">2 players</option></select></label><label>Difficulty <select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><button id="sound" aria-pressed="true">🔊 Sound on</button><button id="restart">↻ Restart</button><button id="controlToggle" aria-pressed="false">🎮 Show touch controls</button><span class="device-note" id="deviceNote"></span></div>
 <div class="frame"><canvas id="game" width="800" height="540" aria-label="Volleyball game with a red blob on the left and a blue blob on the right"></canvas><div class="controls"><div><strong>🔴 Red</strong><div class="pad"><button class="touch" data-key="left" aria-label="Red left">◀</button><button class="touch" data-key="right" aria-label="Red right">▶</button><button class="touch" data-key="jump" aria-label="Red jump">⬆</button></div></div><div id="bluePad"><strong>🔵 Blue</strong><div class="pad"><button class="touch" data-key="bLeft" aria-label="Blue left">◀</button><button class="touch" data-key="bRight" aria-label="Blue right">▶</button><button class="touch" data-key="bJump" aria-label="Blue jump">⬆</button></div></div></div><div id="overlay" class="overlay"><div class="panel"><h2 id="overlayTitle">Beach volleyball time!</h2><p id="overlayText">First to 15 points wins. Control Red using A, D and W, or touch controls. Play against Blue CPU or another player.</p><button class="primary" id="start">▶ Play</button></div></div></div>
 
@@ -65,13 +75,13 @@ function start(){if(red.score>=15||blue.score>=15)resetScores();playing=true;pau
 function resetScores(){red.score=0;blue.score=0;resetBall()}
 function point(side){if(side==='red')red.score++;else blue.score++;tone(520);if(red.score>=15||blue.score>=15){playing=false;show((side==='red'?'Red':'Blue')+' wins! 🏆','Final score: '+red.score+' – '+blue.score,'↻ Play again');$('status').textContent='Match finished';return}resetBall(side==='red'?1:-1);$('status').textContent=(side==='red'?'Red':'Blue')+' scores!'}
 function down(k){return keys.has(k)||!!touchState[k]}
-function moveBlob(p,dir,jump,dt){p.vx=dir*6.5;p.x+=p.vx*dt;const min=p===red?p.r:netX+p.r+netHalf,max=p===red?netX-p.r-netHalf:W-p.r;p.x=Math.max(min,Math.min(max,p.x));if(jump&&p.y>=ground-.1){p.vy=-14.9;tone(200)}p.vy+=.53*dt;p.y+=p.vy*dt;if(p.y>ground){p.y=ground;p.vy=0}}
+function moveBlob(p,dir,jump,dt){p.vx=dir*6.5;p.x+=p.vx*dt;const min=p===red?p.r:netX+p.r+netHalf,max=p===red?netX-p.r-netHalf:W-p.r;p.x=Math.max(min,Math.min(max,p.x));if(jump&&p.y>=ground-.1){p.vy=-17.5;tone(200)}p.vy+=.48*dt;p.y+=p.vy*dt;if(p.y>ground){p.y=ground;p.vy=0}}
 function simulate(dt){frame+=dt;moveBlob(red,(down('right')?1:0)-(down('left')?1:0),down('jump'),dt);
 let d=0,j=false;if($('mode').value==='ai'){const difficulty=$('difficulty').value;const offset=difficulty==='easy'?72:difficulty==='normal'?30:12;const target=ball.x>netX?ball.x+ball.vx*(difficulty==='hard'?12:5):630;d=target>blue.x+offset?1:target<blue.x-offset?-1:0;j=ball.x>netX-25&&ball.x<blue.x+110&&Math.abs(ball.x-blue.x)<(difficulty==='easy'?55:115)&&ball.y<blue.y-10&&ball.y>blue.y-170&&ball.vy>0;if(difficulty==='easy'&&Math.sin(frame*.07)>0.5)j=false;}else{d=(down('bRight')?1:0)-(down('bLeft')?1:0);j=down('bJump')}moveBlob(blue,d,j,dt);
 ball.vy+=.29*dt;const prevX=ball.x,prevY=ball.y;ball.x+=ball.vx*dt;ball.y+=ball.vy*dt;
-if(ball.x<ball.r){ball.x=ball.r;ball.vx=Math.abs(ball.vx)*.95;tone(270)}if(ball.x>W-ball.r){ball.x=W-ball.r;ball.vx=-Math.abs(ball.vx)*.95;tone(270)}if(ball.y<ball.r+55){ball.y=ball.r+55;ball.vy=Math.abs(ball.vy)*.9}
+if(ball.x<ball.r){ball.x=ball.r;ball.vx=Math.abs(ball.vx)*.95;tone(270)}if(ball.x>W-ball.r){ball.x=W-ball.r;ball.vx=-Math.abs(ball.vx)*.95;tone(270)}if(ball.y<ball.r+3){ball.y=ball.r+3;ball.vy=Math.abs(ball.vy)*.82}
 if(ball.y+ball.r>netTop&&ball.y-ball.r<ground&&Math.abs(ball.x-netX)<ball.r+netHalf){if(prevY+ball.r<=netTop){ball.y=netTop-ball.r;ball.vy=-Math.abs(ball.vy)*.8}else if(prevX<netX){ball.x=netX-netHalf-ball.r;ball.vx=-Math.abs(ball.vx)*.83}else{ball.x=netX+netHalf+ball.r;ball.vx=Math.abs(ball.vx)*.83}tone(260)}
-for(const p of [red,blue]){const dx=ball.x-p.x,dy=ball.y-(p.y-p.r*.7),dist=Math.hypot(dx,dy),min=ball.r+p.r*.87;if(dist<min&&dist>0){let nx=dx/dist,ny=dy/dist;ball.x=p.x+nx*min;ball.y=p.y-p.r*.7+ny*min;const speed=Math.max(8,Math.hypot(ball.vx-p.vx,ball.vy-p.vy));ball.vx=Math.max(-10,Math.min(10,nx*speed*.85+p.vx*.48));ball.vy=Math.max(-14.2,Math.min(-4.2,ny*speed-4.5));tone(390)}}
+for(const p of [red,blue]){const dx=ball.x-p.x,dy=ball.y-(p.y-p.r*.7),dist=Math.hypot(dx,dy),min=ball.r+p.r*.87;if(dist<min&&dist>0){let nx=dx/dist,ny=dy/dist;ball.x=p.x+nx*min;ball.y=p.y-p.r*.7+ny*min;const speed=Math.max(8,Math.hypot(ball.vx-p.vx,ball.vy-p.vy));ball.vx=Math.max(-10,Math.min(10,nx*speed*.85+p.vx*.48));ball.vy=Math.max(-16.5,Math.min(-4.2,ny*speed-4.9));tone(390)}}
 if(ball.y+ball.r>=ground+3){point(ball.x<netX?'blue':'red')}}
 function cloud(x,y,s){ctx.fillStyle='#fff9';for(let i=0;i<5;i++){ctx.beginPath();ctx.ellipse(x+(i-2)*28*s,y+Math.sin(i)*9*s,(35-i*2)*s,16*s,0,0,7);ctx.fill()}}
 function palm(x,y,s){ctx.strokeStyle='#8a5129';ctx.lineWidth=15*s;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(x,y);ctx.quadraticCurveTo(x-10*s,y-100*s,x-40*s,y-210*s);ctx.stroke();ctx.save();ctx.translate(x-40*s,y-210*s);for(let a=0;a<9;a++){ctx.save();ctx.rotate(a*Math.PI*2/9);ctx.fillStyle=a%2?'#348f45':'#206c39';ctx.beginPath();ctx.moveTo(0,0);ctx.quadraticCurveTo(60*s,-35*s,125*s,12*s);ctx.quadraticCurveTo(45*s,2*s,0,0);ctx.fill();ctx.restore()}ctx.restore()}
