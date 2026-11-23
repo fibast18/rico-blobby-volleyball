@@ -34,6 +34,16 @@ jobs:
           Path('/tmp/rico-game.js').write_text('\n'.join(scripts))
           PY
           node --check /tmp/rico-game.js
+          python3 - <<'PY'
+          from pathlib import Path
+          page = Path('index.html').read_text()
+          draw = page.split('function draw(){', 1)[1].split('function resizeCourt()', 1)[0]
+          assert 'drawBall();' in draw, "Ball must be rendered every frame"
+          assert 'function drawBall()' in page, "Ball drawing function missing"
+          assert 'ball.y<ball.r+8' in draw, "Offscreen ball marker missing"
+          assert 'Dynamic Island' in page, "iPhone portrait safe-area layout missing"
+          assert 'function serveReset(side=' in page, "Winner-side serve reset missing"
+          PY
   deploy:
     needs: validate
     environment:
