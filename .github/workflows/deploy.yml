@@ -21,6 +21,8 @@ jobs:
           test -s manifest.webmanifest
           test -s sw.js
           test -s icon.svg
+          test -s apple-touch-icon.png
+          test -s version.json
           python3 -m json.tool manifest.webmanifest >/dev/null
           node --check sw.js
           python3 - <<'PY'
@@ -40,6 +42,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Stamp deployment version automatically
+        env:
+          DEPLOY_SHA: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          version = os.environ['DEPLOY_SHA'][:12]
+          page = Path('index.html')
+          html = page.read_text()
+          html, count = re.subn(r"const APP_VERSION='[^']+';", "const APP_VERSION='" + version + "';", html, count=1)
+          if count != 1:
+              raise SystemExit("Missing automatic update version marker")
+          page.write_text(html)
+          Path('version.json').write_text(json.dumps({"version": version}) + "\n")
+          PY
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
