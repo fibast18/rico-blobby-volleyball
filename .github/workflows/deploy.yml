@@ -49,8 +49,9 @@ jobs:
           assert 'const direction=p===red?1:-1' not in collide, "Unfair fixed-direction shots found"
           ai = page.split("function tick(dt){", 1)[1].split("move(blue,dir,jump,dt);", 1)[0]
           assert "const serveTarget=clampBlue(ball.x+offset)" in ai, "CPU angled serve positioning missing"
-          assert "const target=clampBlue((t<14?landing:projected)+safeOffset)" in ai, "Near-net interception positioning missing"
-          assert "const urgentNearNet=" in ai and "const landingT=" in ai, "Near-net landing prediction missing"
+          assert "const target=clampBlue(defensiveX+positionOffset)" in ai, "Near-net interception target missing"
+          assert "const nearNet=" in ai and "const groundT=" in ai, "Near-net landing prediction missing"
+          assert "const ballTooHighForStanding=" in ai, "Grounded defense guard missing"
           assert "cpuJumpCooldown" in ai and "cpuJumpArmed" in ai, "CPU bounce-loop protection missing"
           assert 'const LEARN_KEY=' in page, "AI storage missing"
           assert 'function learnFromRally(result)' in page, "Outcome learning missing"
