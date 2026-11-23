@@ -47,6 +47,10 @@ jobs:
           assert 'const approach=relX*nx+relY*ny' in collide, "Angle-aware bounce missing"
           assert 'const reflectedX=' in collide and 'const reflectedY=' in collide, "Surface reflection missing"
           assert 'const direction=p===red?1:-1' not in collide, "Unfair fixed-direction shots found"
+          ai = page.split("function tick(dt){", 1)[1].split("move(blue,dir,jump,dt);", 1)[0]
+          assert "const serveTarget=clampBlue(ball.x+offset)" in ai, "CPU angled serve positioning missing"
+          assert "const target=clampBlue(arrival+contactOffset)" in ai, "CPU predictive contact positioning missing"
+          assert "cpuJumpCooldown" in ai and "cpuJumpArmed" in ai, "CPU bounce-loop protection missing"
           PY
   deploy:
     needs: validate
