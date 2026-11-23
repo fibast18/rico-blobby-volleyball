@@ -51,6 +51,11 @@ jobs:
           assert "const serveTarget=clampBlue(ball.x+offset)" in ai, "CPU angled serve positioning missing"
           assert "const target=clampBlue(arrival+contactOffset)" in ai, "CPU predictive contact positioning missing"
           assert "cpuJumpCooldown" in ai and "cpuJumpArmed" in ai, "CPU bounce-loop protection missing"
+          assert 'const LEARN_KEY=' in page, "AI storage missing"
+          assert 'function learnFromRally(result)' in page, "Outcome learning missing"
+          assert "learning.positionBias*adaptiveStrength" in ai, "Adaptive positioning inactive"
+          assert "learning.jumpBias*adaptiveStrength" in ai, "Adaptive jump timing inactive"
+          assert "resetLearning" in page, "Learning reset unavailable"
           PY
   deploy:
     needs: validate
