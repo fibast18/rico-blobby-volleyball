@@ -16,19 +16,44 @@ body.fullscreen .controls [data-control=left],body.fullscreen .controls [data-co
 body.fullscreen .hud{left:max(6px,env(safe-area-inset-left));right:max(6px,env(safe-area-inset-right))}
 body.fullscreen .hud .mini{font-size:clamp(10px,1.5vw,13px);padding:5px 7px}
 @media(orientation:landscape) and (max-height:520px){body.fullscreen .stage{width:100vw!important;height:100dvh!important}}
-</style></head><body><main><header><h1>🏐 Rico Blobby Volleyball <small>v1.6.0</small></h1><small>iPhone & smartphone edition</small></header>
+
+/* iOS long-press safety: the game surface is never selectable, draggable or callable. */
+#stage,#stage *,#controls,#controls *{
+  -webkit-touch-callout:none!important;
+  -webkit-user-select:none!important;
+  user-select:none!important;
+  -webkit-user-drag:none!important;
+}
+#stage ::selection{background:transparent}
+#controls .control{
+  appearance:none;-webkit-appearance:none;
+  -webkit-tap-highlight-color:transparent!important;
+  touch-action:none!important;
+  background:rgba(177,212,138,.025)!important;
+  border-color:rgba(255,255,255,.06)!important;
+  color:rgba(255,255,255,.48)!important;
+}
+#controls .control.pressed{background:rgba(255,220,85,.11)!important}
+#controls .arrow-icon{
+  display:block;width:clamp(30px,4.4vw,49px);height:clamp(30px,4.4vw,49px);
+  fill:currentColor;opacity:.33;pointer-events:none;
+}
+#controls .arrow-left{transform:rotate(-90deg)}
+#controls .arrow-right{transform:rotate(90deg)}
+#controls .arrow-up{transform:none}
+</style></head><body><main><header><h1>🏐 Rico Blobby Volleyball <small>v1.7.0</small></h1><small>iPhone & smartphone edition</small></header>
 <div class="options"><label>CPU <select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><button id="sound">🔊 Sound</button><button id="outsideReset">↻ Restart</button><button id="outsideFull">⛶ Fullscreen</button></div>
 <div id="stage" class="stage"><canvas id="game" width="800" height="500" aria-label="Red and blue blobs playing volleyball on a beach"></canvas>
 <div class="hud"><span id="status" class="mini" style="font-size:12px">Ready</span><div class="buttons"><button id="restart" class="mini" aria-label="Restart the game">↻ Restart</button><button id="fullscreen" class="mini" aria-label="Toggle fullscreen">⛶ Expand</button></div></div>
 <div id="message" class="message">Jump to serve from the left court</div>
-<div class="controls" id="controls"><button class="control" data-control="left" aria-label="Move left">◀</button><button class="control" data-control="right" aria-label="Move right">▶</button><button class="control" data-control="jump" aria-label="Jump and serve">⬆</button></div>
+<div class="controls" id="controls"><button class="control" type="button" data-control="left" aria-label="Move left"><svg class="arrow-icon arrow-left" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2 2 12h6v10h8V12h6L12 2z"/></svg></button><button class="control" type="button" data-control="right" aria-label="Move right"><svg class="arrow-icon arrow-right" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2 2 12h6v10h8V12h6L12 2z"/></svg></button><button class="control" type="button" data-control="jump" aria-label="Jump and serve"><svg class="arrow-icon arrow-up" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2 2 12h6v10h8V12h6L12 2z"/></svg></button></div>
 <div id="overlay" class="overlay"><div class="dialog"><h2 id="title">Beach volleyball!</h2><p id="detail">The ball starts above Red on your side. Tap Jump to hit it. Use the two large movement areas on the left and Jump on the far right. First to 15 wins!</p><button id="start">▶ Play</button></div></div>
 </div><div class="landscape-note">📱 Rotate your iPhone sideways for easier play.</div><p class="note">Smartphone touch controls: the left half moves your blob. The far-right quarter jumps. Restart and Fullscreen stay available inside the game.</p><footer class="footer">Original mobile arcade game · Developed by: Engr. Rico J. Pono</footer>
 <script>
 (()=>{'use strict';
 const $=id=>document.getElementById(id),stage=$('stage'),canvas=$('game'),ctx=canvas.getContext('2d');
 let W=800,netX=400;const H=500,ground=430,netTop=262,netHalf=7;
-const red={x:195,y:ground,vy:0,vx:0,r:43,score:0},blue={x:605,y:ground,vy:0,vx:0,r:43,score:0};
+const red={x:195,y:ground,vy:0,vx:0,r:49.45,score:0},blue={x:605,y:ground,vy:0,vx:0,r:49.45,score:0};
 const ball={x:195,y:260,vx:0,vy:0,r:36};
 let running=false,awaitServe=true,last=0,frame=0,sound=true,audio=null,scoreTimer=0;
 const pressed={left:false,right:false,jump:false};
@@ -240,6 +265,10 @@ window.addEventListener('resize',resizeCourt);
 if(window.visualViewport)window.visualViewport.addEventListener('resize',resizeCourt);
 function loop(now){resizeCourt();let dt=Math.min(1.8,(now-last)/16.67||1);last=now;if(running)tick(dt);draw();requestAnimationFrame(loop)}
 document.querySelectorAll('[data-control]').forEach(b=>{const k=b.dataset.control;const release=e=>{if(e)e.preventDefault();pressed[k]=false;b.classList.remove('pressed')};b.addEventListener('pointerdown',e=>{e.preventDefault();try{b.setPointerCapture(e.pointerId)}catch{}pressed[k]=true;b.classList.add('pressed')});b.addEventListener('pointerup',release);b.addEventListener('pointercancel',release);b.addEventListener('lostpointercapture',release)});
+// iOS Safari may show Copy / Look Up on long press unless these defaults are stopped.
+['contextmenu','selectstart','dragstart'].forEach(type=>stage.addEventListener(type,e=>e.preventDefault(),{passive:false}));
+stage.addEventListener('touchstart',e=>{if(e.target.closest('[data-control]'))e.preventDefault()},{passive:false});
+stage.addEventListener('touchmove',e=>{if(e.target.closest('[data-control]'))e.preventDefault()},{passive:false});
 window.addEventListener('blur',clearInput);document.addEventListener('visibilitychange',()=>{if(document.hidden)clearInput()});
 $('start').onclick=begin;$('restart').onclick=restart;$('outsideReset').onclick=restart;
 $('sound').onclick=()=>{sound=!sound;$('sound').textContent=sound?'🔊 Sound':'🔇 Muted'};
