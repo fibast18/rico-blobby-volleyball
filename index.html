@@ -101,14 +101,45 @@ body.fullscreen #controls [data-control=jump]{
   bottom:max(34px,env(safe-area-inset-bottom,0px))!important;
   height:auto!important;
 }
-</style></head><body><main><header><h1>🏐 Rico Blobby Volleyball <small>v2.1.4</small></h1><small>iPhone & smartphone edition</small></header>
+
+/* v2.2: entire LEFT half is an invisible horizontal touch slider. */
+#controls [data-control=slide]{
+  position:absolute!important;top:0!important;left:0!important;right:auto!important;
+  width:50%!important;height:100%!important;bottom:0!important;
+  background:transparent!important;border:0!important;box-shadow:none!important;
+  touch-action:none!important;cursor:ew-resize;
+}
+#controls [data-control=slide].pressed{background:transparent!important}
+#controls .slide-track{
+  position:absolute;left:12%;width:76%;
+  bottom:22px;height:3px;border-radius:99px;
+  background:rgba(255,255,255,.13);pointer-events:none;
+}
+#controls .slide-thumb{
+  position:absolute;top:50%;left:50%;
+  width:17px;height:17px;border:1px solid rgba(255,255,255,.27);
+  border-radius:50%;background:rgba(255,255,255,.23);
+  box-shadow:0 1px 5px rgba(0,0,0,.13);
+  transform:translate(-50%,-50%);pointer-events:none;
+}
+body.fullscreen #controls [data-control=slide]{
+  top:0!important;bottom:max(34px,env(safe-area-inset-bottom,0px))!important;
+  height:auto!important;
+}
+body.fullscreen #controls .slide-track{bottom:17px}
+@media (orientation:landscape) and (max-height:520px){
+  body.fullscreen #controls [data-control=slide]{
+    bottom:max(32px,env(safe-area-inset-bottom,0px))!important;
+  }
+}
+</style></head><body><main><header><h1>🏐 Rico Blobby Volleyball <small>v2.2.0</small></h1><small>iPhone & smartphone edition</small></header>
 <div class="options"><label>CPU <select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><button id="sound">🔊 Sound</button><button id="resetLearning" type="button" title="Reset Blue adaptive learning">🧠 Reset AI</button><span id="aiProgress" aria-live="polite" style="font-size:12px;opacity:.9">Blue AI learning</span><button id="outsideReset">↻ Restart</button><button id="outsideFull">⛶ Fullscreen</button></div>
 <div id="stage" class="stage"><canvas id="game" width="800" height="500" aria-label="Red and blue blobs playing volleyball on a beach"></canvas>
 <div class="hud"><span id="status" class="mini" style="font-size:12px">Ready</span><div class="buttons"><button id="restart" class="mini" aria-label="Restart the game">↻ Restart</button><button id="fullscreen" class="mini" aria-label="Toggle fullscreen">⛶ Expand</button></div></div>
 <div id="message" class="message">Jump to serve from the left court</div>
-<div class="controls" id="controls"><button class="control" type="button" data-control="left" aria-label="Move left"><svg class="arrow-icon arrow-left" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2 2 12h6v10h8V12h6L12 2z"/></svg></button><button class="control" type="button" data-control="right" aria-label="Move right"><svg class="arrow-icon arrow-right" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2 2 12h6v10h8V12h6L12 2z"/></svg></button><button class="control" type="button" data-control="jump" aria-label="Jump anywhere on the right half of the court"></button></div>
-<div id="overlay" class="overlay"><div class="dialog"><h2 id="title">Beach volleyball!</h2><p id="detail">The ball starts above Red. Touch anywhere on the right half of the court to jump and serve. Use the two movement arrows on the lower-left. First to 15 wins!</p><button id="start">▶ Play</button></div></div>
-</div><div class="landscape-note">📱 Rotate your iPhone sideways for easier play.</div><p class="note">Smartphone touch controls: use the lower-left arrows to move Red. Tap anywhere on the right half of the court to jump. Restart and Fullscreen remain accessible.</p><footer class="footer">Original mobile arcade game · Developed by: Engr. Rico J. Pono</footer>
+<div class="controls" id="controls"><div class="control" id="movementPad" data-control="slide" role="slider" aria-label="Slide your finger left or right to move Red Blobby" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" tabindex="0"><span class="slide-track"><span class="slide-thumb" id="slideThumb"></span></span></div><button class="control" type="button" data-control="jump" aria-label="Jump anywhere on the right half of the court"></button></div>
+<div id="overlay" class="overlay"><div class="dialog"><h2 id="title">Beach volleyball!</h2><p id="detail">The ball starts above Red. Touch anywhere on the right half of the court to jump and serve. Slide your finger horizontally across the entire left half to move Red, and tap anywhere on the right half to jump. First to 15 wins!</p><button id="start">▶ Play</button></div></div>
+</div><div class="landscape-note">📱 Rotate your iPhone sideways for easier play.</div><p class="note">Smartphone touch controls: drag anywhere across the left half to slide Red horizontally. Touch the right half to jump. Both areas work together with two fingers.</p><footer class="footer">Original mobile arcade game · Developed by: Engr. Rico J. Pono</footer>
 <script>
 (()=>{'use strict';
 const $=id=>document.getElementById(id),stage=$('stage'),canvas=$('game'),ctx=canvas.getContext('2d');
@@ -116,7 +147,25 @@ let W=800,netX=400;const H=500,ground=430,netTop=262,netHalf=7;
 const red={x:195,y:ground,vy:0,vx:0,r:49.45,score:0,jelly:0,jellyV:0,movePhase:0,hitCooldown:0,movePhase:0,hitCooldown:0},blue={x:605,y:ground,vy:0,vx:0,r:49.45,score:0,jelly:0,jellyV:0};
 const ball={x:195,y:260,vx:0,vy:0,r:36};
 let running=false,awaitServe=true,last=0,frame=0,sound=true,audio=null,scoreTimer=0,server='red',serveDelay=0,rallyTicks=0,lastTouch=null,touchLock=0,cpuJumpCooldown=0,cpuJumpArmed=true,cpuJumpPlan=null;
-const pressed={left:false,right:false,jump:false};
+const pressed={jump:false};
+let slidePointerId=null,slideTargetX=null;
+let lastVolleySide=null,consecutiveTouches=0,touchFault=null;
+function updateMovementTarget(clientX){
+ const rect=stage.getBoundingClientRect();
+ const fraction=clamp((clientX-rect.left)/(rect.width*.5),0,1);
+ // Map the left 50% of the physical touchscreen to the legal Red court.
+ slideTargetX=red.r+fraction*(netX-netHalf-2*red.r);
+ const slider=$('movementPad');
+ slider.setAttribute('aria-valuenow',String(Math.round(fraction*100)));
+}
+function updateMovementVisual(){
+ const thumb=$('slideThumb');
+ if(!thumb)return;
+ const fraction=clamp((red.x-red.r)/(netX-netHalf-2*red.r),0,1);
+ thumb.style.left=(fraction*100)+'%';
+ if(slidePointerId===null)
+   $('movementPad').setAttribute('aria-valuenow',String(Math.round(fraction*100)));
+}
 // Bounded online adaptation. Learned preferences are stored only on this device.
 const LEARN_KEY='rico-blobby-blue-ai-v1';
 const freshLearning=()=>({samples:0,returns:0,misses:0,positionBias:0,jumpBias:0});
@@ -182,9 +231,13 @@ function sandSound(impact){
  }catch{}
 }
 function wakeAudio(){try{audio??=new(window.AudioContext||window.webkitAudioContext)();if(audio.state==='suspended')audio.resume().catch(()=>{})}catch{}}
-function clearInput(){for(const k in pressed)pressed[k]=false;document.querySelectorAll('.control').forEach(b=>b.classList.remove('pressed'))}
+function clearInput(){
+ pressed.jump=false;slideTargetX=null;slidePointerId=null;
+ document.querySelectorAll('.control').forEach(b=>b.classList.remove('pressed'));
+ updateMovementVisual();
+}
 function serveReset(side='red'){
- server=side;cpuAttempt=null;cpuHadTouch=false;
+ server=side;cpuAttempt=null;cpuHadTouch=false;lastVolleySide=null;consecutiveTouches=0;touchFault=null;
  red.x=W*.245;red.y=ground;red.vx=0;red.vy=0;red.jelly=0;red.jellyV=0;red.movePhase=0;red.hitCooldown=0;
  blue.x=W*.755;blue.y=ground;blue.vx=0;blue.vy=0;blue.jelly=0;blue.jellyV=0;blue.movePhase=0;blue.hitCooldown=0;
  ball.x=side==='red'?red.x:blue.x;
@@ -202,9 +255,13 @@ function score(side){
  $('message').textContent=side==='red'?'Red scores — jump to serve':'Blue scores — opponent serves';
 }
 function move(p,dir,jump,dt){
- p.vx=dir*6.6*(W/800);p.x+=p.vx*dt;
+ if(p===red&&slideTargetX!==null){
+  const maxSpeed=9.6*(W/800);
+  p.vx=clamp((slideTargetX-p.x)/Math.max(dt,.15),-maxSpeed,maxSpeed);
+ }else p.vx=dir*6.6*(W/800);
+ p.x+=p.vx*dt;
  p.hitCooldown=Math.max(0,p.hitCooldown-dt);
- if(dir!==0&&p.y>=ground-.1){p.movePhase+=dt*.29;p.jellyV+=Math.sin(p.movePhase*2)*.006*dt}
+ if(Math.abs(p.vx)>.3&&p.y>=ground-.1){p.movePhase+=dt*.29;p.jellyV+=Math.sin(p.movePhase*2)*.006*dt}
  else if(p.y>=ground-.1){p.movePhase+=dt*.12}
  const left=p===red?p.r:netX+netHalf+p.r,right=p===red?netX-netHalf-p.r:W-p.r;
  p.x=Math.max(left,Math.min(right,p.x));
@@ -218,6 +275,7 @@ function move(p,dir,jump,dt){
  p.jellyV+=(-p.jelly*.22-p.jellyV*.24)*dt;
  p.jelly+=p.jellyV*dt;
  p.jelly=Math.max(-.32,Math.min(.32,p.jelly));
+ if(p===red)updateMovementVisual();
 }
 function collide(p){
  // The normal is determined by the ACTUAL point where the ball hits the
@@ -239,6 +297,11 @@ function collide(p){
  const relX=ball.vx-p.vx*.5,relY=ball.vy-p.vy*.5;
  const approach=relX*nx+relY*ny;
  if(approach>0.35&&!awaitServe)return false;
+ // A fair three-touch limit prevents either team from trapping the ball
+ // through repeated self-contacts. No forced shot direction is applied.
+ if(lastVolleySide!==label){lastVolleySide=label;consecutiveTouches=0}
+ consecutiveTouches++;
+ if(consecutiveTouches>3){touchFault=label;return false}
  p.hitCooldown=14;lastTouch=label;touchLock=22;
  if(p===blue&&!awaitServe){cpuHadTouch=true;cpuJumpPlan=null;}
  p.jellyV+=Math.max(-.25,Math.min(.25,-ny*.24));
@@ -247,7 +310,7 @@ function collide(p){
  const reflectedX=relX-2*Math.min(0,approach)*nx;
  const reflectedY=relY-2*Math.min(0,approach)*ny;
  const impulse=Math.max(7.7,Math.min(11.6,Math.hypot(relX,relY)*.75+3.2));
- let vx=reflectedX*.34+nx*impulse*.83+p.vx*.27;
+ let vx=reflectedX*.34+nx*impulse*1.18+p.vx*.27;
  let vy=reflectedY*.29+ny*impulse*.90+p.vy*.20-1.1;
  // Serving uses exactly the same contact-angle rule; the CPU does not
  // receive a hidden aim assist.
@@ -291,7 +354,7 @@ function resolveNetCollision(body){
 }
 function tick(dt){
  frame+=dt;rallyTicks+=dt;touchLock=Math.max(0,touchLock-dt);
- move(red,(pressed.right?1:0)-(pressed.left?1:0),pressed.jump,dt);
+ move(red,slideTargetX===null?0:Math.sign(slideTargetX-red.x),pressed.jump,dt);
  const difficulty=$('difficulty').value;
  let dir=0,jump=false;
  const adaptiveStrength=difficulty==='easy'?.25:difficulty==='normal'?.65:1;
@@ -338,7 +401,10 @@ function tick(dt){
   const defensiveX=nearNet?Math.min(contactX,groundX):contactX;
   // Aim for a playable interception first; angling is optional only
   // once there is adequate time and distance from the net.
-  const positionOffset=nearNet?0:clamp((blue.r+ball.r)*.2+learning.positionBias*adaptiveStrength,-8,24);
+  // Blue positions to the right of the incoming ball so the SAME
+  // angle-based physics naturally returns it left, instead of straight up.
+  const contactBias=clamp((blue.r+ball.r)*.48+learning.positionBias*adaptiveStrength,18,52);
+  const positionOffset=nearNet?Math.min(21,contactBias):contactBias;
   let target=clampBlue(defensiveX+positionOffset);
   if(cpuJumpPlan)target=clampBlue(cpuJumpPlan.target);
   const tolerance=difficulty==='easy'?20:difficulty==='normal'?8:5;
@@ -378,7 +444,7 @@ function tick(dt){
     let best=null;
     for(const sample of samples){
       if(sample.t<6||sample.t>40)continue;
-      const wantedX=clampBlue(sample.x+(nearNet?0:Math.min(14,positionOffset)));
+      const wantedX=clampBlue(sample.x+Math.min(nearNet?17:35,positionOffset));
       const distanceX=Math.abs(wantedX-blue.x);
       if(distanceX>travelSpeed*sample.t+collisionX*.45)continue;
       // If a standing Blobby can meet a low shot, stay grounded.
@@ -436,6 +502,12 @@ function tick(dt){
  // Open sky: the ball can rise beyond the visible court and return under gravity.
  resolveNetCollision(ball);
  collide(red);collide(blue);
+ if(touchFault){
+   const fouled=touchFault;touchFault=null;
+   score(fouled==='blue'?'red':'blue');
+   $('message').textContent=(fouled==='blue'?'Blue':'Red')+' — too many touches';
+   return;
+ }
  if(ball.y+ball.r>=ground){sandSound(ball.vy);score(ball.x<netX?'blue':'red');return}
  // Failsafe for a stalled rally, rather than trapping players in a 0-0 loop.
  if(rallyTicks>1500){score(ball.x<netX?'blue':'red');return}
@@ -634,12 +706,58 @@ function resizeCourt(){
 window.addEventListener('resize',resizeCourt);
 if(window.visualViewport)window.visualViewport.addEventListener('resize',resizeCourt);
 function loop(now){resizeCourt();let dt=Math.min(1.8,(now-last)/16.67||1);last=now;if(running)tick(dt);draw();requestAnimationFrame(loop)}
-document.querySelectorAll('[data-control]').forEach(b=>{const k=b.dataset.control;const release=e=>{if(e)e.preventDefault();pressed[k]=false;b.classList.remove('pressed')};b.addEventListener('pointerdown',e=>{e.preventDefault();wakeAudio();try{b.setPointerCapture(e.pointerId)}catch{}pressed[k]=true;b.classList.add('pressed')});b.addEventListener('pointerup',release);b.addEventListener('pointercancel',release);b.addEventListener('lostpointercapture',release)});
+const movementPad=$('movementPad');
+movementPad.addEventListener('pointerdown',e=>{
+ e.preventDefault();wakeAudio();
+ if(slidePointerId!==null)return;
+ slidePointerId=e.pointerId;
+ try{movementPad.setPointerCapture(e.pointerId)}catch{}
+ updateMovementTarget(e.clientX);
+ movementPad.classList.add('pressed');
+});
+movementPad.addEventListener('pointermove',e=>{
+ if(e.pointerId!==slidePointerId)return;
+ e.preventDefault();
+ updateMovementTarget(e.clientX);
+});
+function releaseSlider(e){
+ if(e.pointerId!==slidePointerId)return;
+ e.preventDefault();
+ slidePointerId=null;slideTargetX=null;
+ movementPad.classList.remove('pressed');
+ updateMovementVisual();
+}
+for(const type of ['pointerup','pointercancel','lostpointercapture'])
+ movementPad.addEventListener(type,releaseSlider);
+movementPad.addEventListener('keydown',e=>{
+ if(e.key==='ArrowLeft'||e.key==='ArrowRight'){
+  e.preventDefault();
+  const delta=e.key==='ArrowLeft'?-24:24;
+  const next=clamp(red.x+delta,red.r,netX-netHalf-red.r);
+  red.x=next;red.vx=delta>0?1:-1;
+  updateMovementVisual();
+ }
+});
+// The right half remains an independent jump input for two-finger play.
+const jumpPad=$('controls').querySelector('[data-control="jump"]');
+const heldJumpPointers=new Set();
+function syncJump(){pressed.jump=heldJumpPointers.size>0}
+jumpPad.addEventListener('pointerdown',e=>{
+ e.preventDefault();wakeAudio();
+ heldJumpPointers.add(e.pointerId);syncJump();
+ try{jumpPad.setPointerCapture(e.pointerId)}catch{}
+});
+for(const type of ['pointerup','pointercancel','lostpointercapture']){
+ jumpPad.addEventListener(type,e=>{
+  if(!heldJumpPointers.has(e.pointerId))return;
+  e.preventDefault();heldJumpPointers.delete(e.pointerId);syncJump();
+ });
+}
 // iOS Safari may show Copy / Look Up on long press unless these defaults are stopped.
 ['contextmenu','selectstart','dragstart'].forEach(type=>stage.addEventListener(type,e=>e.preventDefault(),{passive:false}));
 stage.addEventListener('touchstart',e=>{if(e.target.closest('[data-control]'))e.preventDefault()},{passive:false});
 stage.addEventListener('touchmove',e=>{if(e.target.closest('[data-control]'))e.preventDefault()},{passive:false});
-window.addEventListener('blur',clearInput);document.addEventListener('visibilitychange',()=>{if(document.hidden)clearInput()});
+window.addEventListener('blur',()=>{heldJumpPointers.clear();clearInput()});document.addEventListener('visibilitychange',()=>{if(document.hidden){heldJumpPointers.clear();clearInput()}});
 $('start').onclick=()=>{wakeAudio();begin()};$('restart').onclick=restart;$('outsideReset').onclick=restart;
 $('sound').onclick=()=>{sound=!sound;$('sound').textContent=sound?'🔊 Sound':'🔇 Muted'};
 $('resetLearning').onclick=()=>{learning=freshLearning();saveLearning();cpuAttempt=null;cpuHadTouch=false;updateLearningLabel();$('status').textContent='AI learning reset'};
