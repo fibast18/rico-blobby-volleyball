@@ -26,7 +26,7 @@
 .touch-device .frame>.controls,.show-touch .frame>.controls{display:flex;align-items:end}
 .touch-device .frame>.controls .touch,.show-touch .frame>.controls .touch{min-width:clamp(45px,12vw,88px);min-height:clamp(43px,9vw,63px);border-radius:11px;font-size:clamp(19px,4vw,32px);box-shadow:inset 0 0 12px #e1f2bf7a}
 .frame>.controls #bluePad[hidden]{display:none!important}
-.frame>.controls .pad{gap:4px!important}
+.frame>.controls>div:first-child{flex:1;min-width:0}.frame>.controls>div:first-child .pad{display:flex;width:100%;gap:4px!important}.frame>.controls #bluePad{flex:1;min-width:0}.frame>.controls #bluePad .pad{display:flex;gap:4px!important}
 .frame>.controls .jump-button{margin-left:auto}
 @media(max-width:680px){.frame>.controls{padding:0 5px 4px!important}.touch-device .frame>.controls .touch,.show-touch .frame>.controls .touch{min-width:clamp(42px,14vw,75px);min-height:clamp(39px,11vw,55px)}}
 @media(orientation:landscape) and (max-height:540px){.frame>.controls{padding-bottom:5px!important}.touch-device .frame>.controls .touch,.show-touch .frame>.controls .touch{min-width:clamp(55px,8vw,82px);min-height:clamp(42px,8vh,55px)}}
