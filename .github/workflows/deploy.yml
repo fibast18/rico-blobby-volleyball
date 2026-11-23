@@ -36,6 +36,7 @@ jobs:
           node --check /tmp/rico-game.js
           node tests/blue-ai-regression.cjs
           node tests/net-and-touch-regression.cjs
+          node tests/touch-slider-and-rally-regression.cjs
           python3 - <<'PY'
           from pathlib import Path
           page = Path('index.html').read_text()
