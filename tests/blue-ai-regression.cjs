@@ -17,7 +17,7 @@ function runScenario({ball,blueX,frames=10}) {
     red:{x:195,y:430,r:49.45,vy:0,hitCooldown:0},
     blue:{x:blueX,y:430,r:49.45,vy:0,hitCooldown:0},
     ball:{...ball,r:36},
-    pressed:{left:false,right:false,jump:false},
+    pressed:{jump:false},slideTargetX:null,touchFault:null,lastVolleySide:null,consecutiveTouches:0,
     awaitServe:false,server:'red',serveDelay:0,
     cpuJumpCooldown:0,cpuJumpArmed:true,cpuJumpPlan:null,
     cpuAttempt:null,cpuHadTouch:false,
