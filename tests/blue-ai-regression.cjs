@@ -6,8 +6,8 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const assert=require('node:assert/strict');
 const page=fs.readFileSync('index.html','utf8');
-const head=page.indexOf('function tick(dt){'),tail=page.indexOf('/* Cached',head);
-assert(head>=0&&tail>head,'Could not locate actual game tick function');
+const head=page.indexOf('function resolveNetCollision(body){'),tail=page.indexOf('/* Cached',head);
+assert(head>=0&&tail>head,'Could not locate actual net physics and game tick functions');
 const tickCode=page.slice(head,tail);
 
 function runScenario({ball,blueX,frames=10}) {
