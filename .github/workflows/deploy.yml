@@ -36,6 +36,7 @@ jobs:
           PY
           node --check /tmp/rico-game.js
           node tests/blue-ai-regression.cjs
+          node tests/cpu-serve-and-difficulty-regression.cjs
           node tests/blue-return-and-sound-regression.cjs
           node tests/net-and-touch-regression.cjs
           node tests/touch-slider-and-rally-regression.cjs
