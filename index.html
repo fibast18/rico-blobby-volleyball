@@ -194,6 +194,11 @@ button.clock:active{background:#1b6593}
  .history-tabs button{min-height:29px}
  .history-heading h2{font-size:16px}
 }
+
+/* Dialogs live outside the touch-action:none court, enabling iPhone scrolling. */
+.settings-panel{position:fixed!important;z-index:1000!important;touch-action:auto!important}
+.history-panel{position:fixed!important;z-index:1001!important;touch-action:auto!important}
+.history-items{touch-action:pan-y!important}
 </style></head><body class="fullscreen"><main>
 <div id="stage" class="stage"><canvas id="game" width="800" height="500" aria-label="Red and blue blobs playing volleyball on a beach"></canvas>
 <div class="hud">
@@ -203,6 +208,7 @@ button.clock:active{background:#1b6593}
 <div id="message" class="message" hidden aria-live="polite"></div>
 <div class="controls" id="controls"><div class="control" id="movementPad" data-control="slide" role="slider" aria-label="Slide your finger left or right to move Red Blobby" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" tabindex="0"><span class="slide-track"><span class="slide-thumb" id="slideThumb"></span></span></div><button class="control" type="button" data-control="jump" aria-label="Jump anywhere on the right half of the court"></button></div>
 <div id="overlay" class="overlay"><div class="dialog"><h2 id="title">Ready to play?</h2><p id="detail">First to 15 points.</p><button id="start" type="button">▶ Play</button></div></div>
+</div>
 <div id="settingsPanel" class="settings-panel" role="dialog" aria-modal="true" aria-label="Game settings" hidden><div class="settings-dialog">
 <h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.4.0</small></p>
 <label class="settings-field">Difficulty<select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label>
@@ -222,7 +228,6 @@ button.clock:active{background:#1b6593}
   <div id="historyItems" class="history-items" role="list"></div>
   <p class="history-note">Saved on this device • Pause time excluded</p>
  </div>
-</div>
 </div>
 <script>
 (()=>{'use strict';
