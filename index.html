@@ -272,6 +272,55 @@ function clearInput(){
 }
 // Match clock runs for the whole race to 15; the point clock runs only
 // after a serve, resets after every point, and both freeze while paused.
+// Keep a paused match recoverable if iOS unloads the Home Screen app.
+const MATCH_KEY='rico-blobby-current-match-v1';
+let lastSnapshotMs=0;
+function clearSavedMatch(){try{localStorage.removeItem(MATCH_KEY)}catch{}}
+function saveMatch(){
+ if(!running)return;
+ const pick=p=>({x:p.x,y:p.y,vx:p.vx,vy:p.vy,score:p.score});
+ const snapshot={
+  savedAt:Date.now(),W,red:pick(red),blue:pick(blue),ball:pick(ball),
+  matchMs,pointMs,server,awaitServe,frame,rallyTicks,
+  lastVolleySide,consecutiveTouches
+ };
+ try{localStorage.setItem(MATCH_KEY,JSON.stringify(snapshot))}catch{}
+}
+function restoreSavedMatch(){
+ let v;
+ try{v=JSON.parse(localStorage.getItem(MATCH_KEY)||'null')}catch{return false}
+ if(!v||!v.red||!v.blue||!v.ball||!Number.isFinite(v.savedAt)||
+    Date.now()-v.savedAt>24*3600*1000||!Number.isFinite(v.W)||
+    !Number.isFinite(v.red.score)||!Number.isFinite(v.blue.score)||
+    Math.max(v.red.score,v.blue.score)>=15){clearSavedMatch();return false}
+ const scale=W/v.W;
+ const restore=(p,prior,minX,maxX)=>{
+  p.x=clamp((Number(prior.x)||0)*scale,minX,maxX);
+  p.y=clamp(Number(prior.y)||ground,-1500,ground);
+  p.vx=clamp((Number(prior.vx)||0)*scale,-24,24);
+  p.vy=clamp(Number(prior.vy)||0,-40,40);
+  if('score'in p)p.score=clamp(Math.floor(Number(prior.score)||0),0,14);
+ };
+ restore(red,v.red,red.r,netX-netHalf-red.r);
+ restore(blue,v.blue,netX+netHalf+blue.r,W-blue.r);
+ ball.x=clamp((Number(v.ball.x)||0)*scale,ball.r,W-ball.r);
+ ball.y=clamp(Number(v.ball.y)||ground-170,-5000,ground);
+ ball.vx=clamp((Number(v.ball.vx)||0)*scale,-35,35);
+ ball.vy=clamp(Number(v.ball.vy)||0,-35,35);
+ matchMs=clamp(Number(v.matchMs)||0,0,24*3600*1000);
+ pointMs=clamp(Number(v.pointMs)||0,0,matchMs);
+ frame=Number(v.frame)||0;rallyTicks=Number(v.rallyTicks)||0;
+ server=v.server==='blue'?'blue':'red';awaitServe=Boolean(v.awaitServe);
+ lastVolleySide=v.lastVolleySide==='red'||v.lastVolleySide==='blue'?v.lastVolleySide:null;
+ consecutiveTouches=clamp(Number(v.consecutiveTouches)||0,0,3);
+ cpuJumpPlan=null;cpuJumpArmed=true;cpuJumpCooldown=0;
+ running=true;paused=true;clearInput();
+ $('overlay').hidden=true;$('status').textContent='Paused';
+ $('pauseBtn').textContent='▶ Resume';
+ $('pauseBtn').setAttribute('aria-pressed','true');
+ updateTimers();
+ return true;
+}
 function clockText(ms){
  const seconds=Math.floor(ms/1000);
  return String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0');
@@ -284,7 +333,7 @@ function updateTimers(){
 function setPaused(value){
  if(!running)return;
  paused=Boolean(value);
- if(paused){clearInput();heldJumpPointers.clear()}
+ if(paused){clearInput();heldJumpPointers.clear();saveMatch()}
  $('status').textContent=paused?'Paused':'Playing';
  $('pauseBtn').textContent=paused?'▶ Resume':'⏸ Pause';
  $('pauseBtn').setAttribute('aria-pressed',String(paused));
@@ -304,6 +353,7 @@ function serveReset(side='red'){
 }
 function begin(){
  if(applyPendingUpdate())return;
+ clearSavedMatch();lastSnapshotMs=0;
  updateLearningLabel();
  red.score=0;blue.score=0;frame=0;
  matchMs=0;pointMs=0;paused=false;
@@ -317,7 +367,7 @@ function begin(){
 }
 function restart(){if(applyPendingUpdate())return;begin()}
 function finish(){
- running=false;paused=false;clearInput();
+ running=false;paused=false;clearInput();clearSavedMatch();
  const finalScore=red.score+' : '+blue.score;
  $('title').textContent=red.score>=15?'Red wins! 🎉':'Blue wins!';
  $('detail').textContent='Final score '+finalScore;
@@ -331,7 +381,7 @@ function score(side){
  learnFromRally(side);
  if(side==='red')red.score++;else blue.score++;
  if(red.score>=15||blue.score>=15){finish();return}
- serveReset(side);updateTimers();
+ serveReset(side);updateTimers();saveMatch();
  $('message').textContent=side==='red'?'Red scores — jump to serve':'Blue scores — opponent serves';
 }
 function move(p,dir,jump,dt){
@@ -811,6 +861,7 @@ function loop(now){
   if(!awaitServe)pointMs+=rawDelta;
   tick(dt);
   updateTimers();
+  if(matchMs-lastSnapshotMs>=5000){saveMatch();lastSnapshotMs=matchMs}
  }
  draw();
  requestAnimationFrame(loop);
@@ -925,7 +976,7 @@ window.addEventListener('online',maybeCheck);
 window.addEventListener('focus',maybeCheck);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)maybeCheck()});
 setInterval(()=>{if(!document.hidden)maybeCheck()},15*60*1000);
-resizeCourt();renderBackdrop();serveReset();requestAnimationFrame(loop);maybeCheck();
+resizeCourt();renderBackdrop();serveReset();restoreSavedMatch();requestAnimationFrame(loop);maybeCheck();
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 })();
 </script></main></body></html>
