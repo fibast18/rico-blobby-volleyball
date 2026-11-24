@@ -38,7 +38,7 @@ function scenario({x,y,vx,vy,blueX=605,frames=25,learned=0}){
 }
 // Ready posture: the whole right half's midpoint is the waiting position.
 // Previous versions wandered directly toward the net before Red served.
-assert(page.includes('blue.x=(netX+W)*.5;blue.y=ground'),
+assert(page.includes('blue.x=(netX+W)*.5;blue.aiAim=blue.x'),
  'Each point must start with Blue in the exact middle of its court');
 const idle=scenario({x:190,y:260,vx:0,vy:0,blueX:600,frames:5});
 assert(idle.trace.every(row=>Math.abs(row.blueX-600)<.01),
