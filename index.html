@@ -199,6 +199,7 @@ button.clock:active{background:#1b6593}
 .settings-panel{position:fixed!important;z-index:1000!important;touch-action:auto!important}
 .history-panel{position:fixed!important;z-index:1001!important;touch-action:auto!important}
 .history-items{touch-action:pan-y!important}
+.difficulty-note{font-size:12px;opacity:.83;margin:-6px 0 2px;text-align:center}
 </style></head><body class="fullscreen"><main>
 <div id="stage" class="stage"><canvas id="game" width="800" height="500" aria-label="Red and blue blobs playing volleyball on a beach"></canvas>
 <div class="hud">
@@ -210,8 +211,8 @@ button.clock:active{background:#1b6593}
 <div id="overlay" class="overlay"><div class="dialog"><h2 id="title">Ready to play?</h2><p id="detail">First to 15 points.</p><button id="start" type="button">▶ Play</button></div></div>
 </div>
 <div id="settingsPanel" class="settings-panel" role="dialog" aria-modal="true" aria-label="Game settings" hidden><div class="settings-dialog">
-<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.5.1</small></p>
-<label class="settings-field">Difficulty<select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label>
+<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.6.0</small></p>
+<label class="settings-field">Difficulty<select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><p class="difficulty-note" id="difficultyDescription">Normal • balanced speed, timing and aim</p>
 <button id="sound" class="settings-action" type="button">🔊 Sound on</button>
 <button id="resetLearning" class="settings-action" type="button">🧠 Reset Blue AI</button>
 <p class="developer">Developed by: Engr. Rico J. Pono</p>
@@ -572,7 +573,7 @@ function pauseOnExit(){
 function serveReset(side='red'){
  server=side;cpuAttempt=null;cpuHadTouch=false;lastVolleySide=null;consecutiveTouches=0;touchFault=null;
  red.x=W*.245;red.y=ground;red.vx=0;red.vy=0;red.jelly=0;red.jellyV=0;red.movePhase=0;red.hitCooldown=0;
- blue.x=(netX+W)*.5;blue.y=ground;blue.vx=0;blue.vy=0;blue.jelly=0;blue.jellyV=0;blue.movePhase=0;blue.hitCooldown=0;
+ blue.x=(netX+W)*.5;blue.aiAim=blue.x;blue.aiDelay=0;blue.cpuSpeed=6.7;blue.y=ground;blue.vx=0;blue.vy=0;blue.jelly=0;blue.jellyV=0;blue.movePhase=0;blue.hitCooldown=0;
  ball.x=side==='red'?red.x:blue.x;
  ball.y=ground-170;ball.vx=0;ball.vy=0;awaitServe=true;pointMs=0;scoreTimer=0;serveDelay=0;rallyTicks=0;lastTouch=null;touchLock=0;cpuJumpCooldown=0;cpuJumpArmed=true;cpuJumpPlan=null;clearInput();
  $('message').textContent=side==='red'?'Jump to serve from your court':'Blue serves next';
@@ -620,7 +621,7 @@ function move(p,dir,jump,dt){
  if(p===red&&slideTargetX!==null){
   const maxSpeed=9.6*(W/800);
   p.vx=clamp((slideTargetX-p.x)/Math.max(dt,.15),-maxSpeed,maxSpeed);
- }else p.vx=dir*(p===blue?7.8:6.6)*(W/800);
+ }else p.vx=dir*(p===blue?(p.cpuSpeed??7.8):6.6)*(W/800);
  p.x+=p.vx*dt;
  p.hitCooldown=Math.max(0,p.hitCooldown-dt);
  if(Math.abs(p.vx)>.3&&p.y>=ground-.1){p.movePhase+=dt*.29;p.jellyV+=Math.sin(p.movePhase*2)*.006*dt}
@@ -736,11 +737,18 @@ function tick(dt){
  frame+=dt;rallyTicks+=dt;touchLock=Math.max(0,touchLock-dt);
  move(red,slideTargetX===null?0:Math.sign(slideTargetX-red.x),pressed.jump,dt);
  const difficulty=$('difficulty').value;
+ const cpuProfiles={
+  easy:  {speed:4.2,reaction:16,error:29,tolerance:20,horizon:48,serveDelay:46,jumpCooldown:51},
+  normal:{speed:6.7,reaction:6,error:9,tolerance:8,horizon:66,serveDelay:34,jumpCooldown:39},
+  hard:  {speed:9.4,reaction:1,error:0,tolerance:4,horizon:82,serveDelay:26,jumpCooldown:31}
+ };
+ const profile=cpuProfiles[difficulty]||cpuProfiles.normal;
+ blue.cpuSpeed=profile.speed;
  const adaptiveStrength=difficulty==='easy'?.25:difficulty==='normal'?.65:1;
  cpuJumpCooldown=Math.max(0,cpuJumpCooldown-dt);
  const blueMin=netX+netHalf+blue.r,blueMax=W-blue.r;
  const clampBlue=x=>clamp(x,blueMin,blueMax);
- const runSpeed=7.8*(W/800);
+ const runSpeed=profile.speed*(W/800);
  // Ready position is the EXACT center of Blue's half, not near the net.
  const home=clampBlue((netX+W)*.5);
  let dir=0,jump=false,aim=home;
@@ -748,7 +756,7 @@ function tick(dt){
    serveDelay+=dt;
    const offset=(blue.r+ball.r)*.58;
    aim=clampBlue(ball.x+offset);
-   if(serveDelay>32&&Math.abs(aim-blue.x)<28&&blue.y>=ground-.1&&cpuJumpCooldown===0){
+   if(serveDelay>profile.serveDelay&&Math.abs(aim-blue.x)<Math.max(28,profile.tolerance+8)&&blue.y>=ground-.1&&cpuJumpCooldown===0){
      jump=true;cpuJumpCooldown=30;cpuJumpArmed=false;
    }
  }else if(!awaitServe){
@@ -757,7 +765,7 @@ function tick(dt){
    // toward the net by default.
    const forecast=[];
    const sim={x:ball.x,y:ball.y,vx:ball.vx,vy:ball.vy,r:ball.r};
-   for(let n=1;n<=76;n++){
+   for(let n=1;n<=profile.horizon;n++){
      advanceBall(sim,1);
      if(sim.y+ball.r>=ground)break;
      if(sim.x>=netX-ball.r&&sim.x<=W-ball.r)
@@ -818,7 +826,8 @@ function tick(dt){
      // Only jump for a genuinely high, reachable ball. Never jump over a
      // low incoming shot with a reachable grounded contact in <=30 frames.
      const groundedSoon=stand&&stand.t<=30;
-     const highEnough=ball.y<ground-blue.r*2.5-ball.r&&
+     const heightDemand=difficulty==='hard'?2.1:difficulty==='easy'?3.1:2.5;
+     const highEnough=ball.y<ground-blue.r*heightDemand-ball.r&&
        ball.x>=netX+ball.r*.4&&ball.vy<3;
      if(!groundedSoon&&highEnough&&cpuJumpCooldown===0&&cpuJumpArmed){
        let aerial=null;
@@ -840,7 +849,7 @@ function tick(dt){
        if(aerial&&(!stand||stand.t>aerial.t+10)){
          aim=aerial.target;
          cpuJumpPlan={target:aerial.target};
-         jump=true;cpuJumpCooldown=39;cpuJumpArmed=false;
+         jump=true;cpuJumpCooldown=profile.jumpCooldown;cpuJumpArmed=false;
          cpuAttempt={offsetError:clamp(aerial.target-blue.x,-60,60),
            timingError:clamp(aerial.t-13,-15,15)};
          cpuHadTouch=false;
@@ -860,7 +869,24 @@ function tick(dt){
    if(ball.x<netX-80&&ball.vx<=0&&blue.y>=ground-.1)
      cpuJumpArmed=true;
  }
- const tolerance=difficulty==='easy'?22:difficulty==='normal'?7:5;
+ // Difficulty genuinely changes reaction time, running speed and
+ // interception accuracy. Error is stable during a rally, not jittery
+ // on every frame. All contact physics remain identical for both sides.
+ if(!awaitServe){
+  if(!Number.isFinite(blue.aiDelay))blue.aiDelay=0;
+  if(!Number.isFinite(blue.aiAim))blue.aiAim=home;
+  const emergency=ball.x>netX+ball.r&&ball.vy>1&&
+    ball.y>ground-155&&Math.abs(ball.x-blue.x)<blue.r*2;
+  if(blue.aiDelay<=0||emergency){
+   const error=profile.error*Math.sin((red.score+1)*8.14+(blue.score+1)*2.91);
+   blue.aiAim=clampBlue(aim+(aim===home?0:error));
+   blue.aiDelay=profile.reaction;
+  }else{
+   blue.aiDelay=Math.max(0,blue.aiDelay-dt);
+  }
+  aim=blue.aiAim;
+ }
+ const tolerance=profile.tolerance;
  dir=aim>blue.x+tolerance?1:aim<blue.x-tolerance?-1:0;
  move(blue,dir,jump,dt);
  if(awaitServe){collide(server==='red'?red:blue);return}
@@ -1157,6 +1183,16 @@ function closeSettings(){
 $('closeSettings').onclick=closeSettings;
 $('settingsPanel').addEventListener('pointerdown',e=>{if(e.target===$('settingsPanel'))closeSettings()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('settingsPanel').hidden)closeSettings()});
+const updateDifficultyDescription=()=>{
+ const descriptions={
+  easy:'Easy • slower movement, delayed reactions, less accurate positioning',
+  normal:'Normal • balanced speed, timing and aim',
+  hard:'Hard • fast movement, quick reactions, precise interception'
+ };
+ $('difficultyDescription').textContent=descriptions[$('difficulty').value]||descriptions.normal;
+};
+$('difficulty').addEventListener('change',updateDifficultyDescription);
+updateDifficultyDescription();
 $('sound').onclick=()=>{sound=!sound;$('sound').textContent=sound?'🔊 Sound on':'🔇 Sound off'};
 $('resetLearning').onclick=()=>{
  learning=freshLearning();saveLearning();cpuAttempt=null;cpuHadTouch=false;updateLearningLabel();
