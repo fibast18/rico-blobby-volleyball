@@ -54,6 +54,8 @@ jobs:
           assert 'const approach=relX*nx+relY*ny' in collide, "Angle-aware bounce missing"
           assert 'const reflectedX=' in collide and 'const reflectedY=' in collide, "Surface reflection missing"
           assert 'const direction=p===red?1:-1' not in collide, "Unfair fixed-direction shots found"
+          assert "chooseBlueReturn(" not in page, "Forced Blue return overrides contact physics"
+          assert "if(shot){vx=shot.vx;vy=shot.vy}" not in page, "Artificial Blue velocity override detected"
           ai = page.split("function tick(dt){", 1)[1].split("move(blue,dir,jump,dt);", 1)[0]
           assert "const forecast=[]" in ai, "CPU must forecast ball trajectories"
           assert "advanceBall(sim,1)" in ai, "CPU must simulate the real net and wall physics"
