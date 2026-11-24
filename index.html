@@ -211,7 +211,7 @@ button.clock:active{background:#1b6593}
 <div id="overlay" class="overlay"><div class="dialog"><h2 id="title">Ready to play?</h2><p id="detail">First to 15 points.</p><button id="start" type="button">▶ Play</button></div></div>
 </div>
 <div id="settingsPanel" class="settings-panel" role="dialog" aria-modal="true" aria-label="Game settings" hidden><div class="settings-dialog">
-<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.6.0</small></p>
+<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.6.1</small></p>
 <label class="settings-field">Difficulty<select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><p class="difficulty-note" id="difficultyDescription">Normal • balanced speed, timing and aim</p>
 <button id="sound" class="settings-action" type="button">🔊 Sound on</button>
 <button id="resetLearning" class="settings-action" type="button">🧠 Reset Blue AI</button>
@@ -236,7 +236,7 @@ const $=id=>document.getElementById(id),stage=$('stage'),canvas=$('game'),ctx=ca
 let W=800,netX=400;const H=500,ground=430,netTop=262,netHalf=7;
 const red={x:195,y:ground,vy:0,vx:0,r:49.45,score:0,jelly:0,jellyV:0,movePhase:0,hitCooldown:0,movePhase:0,hitCooldown:0},blue={x:605,y:ground,vy:0,vx:0,r:49.45,score:0,jelly:0,jellyV:0};
 const ball={x:195,y:260,vx:0,vy:0,r:36};
-let running=false,paused=false,matchMs=0,pointMs=0,awaitServe=true,last=0,frame=0,sound=true,audio=null,scoreTimer=0,server='red',serveDelay=0,rallyTicks=0,lastTouch=null,touchLock=0,cpuJumpCooldown=0,cpuJumpArmed=true,cpuJumpPlan=null;
+let running=false,paused=false,matchStarted=false,matchMs=0,pointMs=0,awaitServe=true,last=0,frame=0,sound=true,audio=null,scoreTimer=0,server='red',serveDelay=0,rallyTicks=0,lastTouch=null,touchLock=0,cpuJumpCooldown=0,cpuJumpArmed=true,cpuJumpPlan=null;
 const pressed={jump:false};
 let slidePointerId=null,slideTargetX=null;
 let lastVolleySide=null,consecutiveTouches=0,touchFault=null;
@@ -503,7 +503,7 @@ function saveMatch(){
  const pick=p=>({x:p.x,y:p.y,vx:p.vx,vy:p.vy,score:p.score});
  const snapshot={
   savedAt:Date.now(),W,red:pick(red),blue:pick(blue),ball:pick(ball),
-  matchMs,pointMs,server,awaitServe,frame,rallyTicks,
+  matchMs,pointMs,matchStarted,server,awaitServe,frame,rallyTicks,
   matchId,matchStartedAt,pointNumber,lastVolleySide,consecutiveTouches
  };
  try{localStorage.setItem(MATCH_KEY,JSON.stringify(snapshot))}catch{}
@@ -531,6 +531,10 @@ function restoreSavedMatch(){
  ball.vy=clamp(Number(v.ball.vy)||0,-35,35);
  matchMs=clamp(Number(v.matchMs)||0,0,24*3600*1000);
  pointMs=clamp(Number(v.pointMs)||0,0,matchMs);
+ // Old saved matches have no explicit start flag; infer from elapsed time,
+ // score, or a rally already in progress without altering recorded times.
+ matchStarted=typeof v.matchStarted==='boolean'?v.matchStarted:
+   (matchMs>0||pointMs>0||v.red.score+v.blue.score>0||v.awaitServe===false);
  matchId=typeof v.matchId==='string'&&v.matchId.length<80?v.matchId:null;
  if(!matchId)newMatchIdentity();
  matchStartedAt=Number.isFinite(v.matchStartedAt)?v.matchStartedAt:Date.now()-matchMs;
@@ -585,7 +589,7 @@ function begin(){
  clearSavedMatch();lastSnapshotMs=0;newMatchIdentity();
  updateLearningLabel();
  red.score=0;blue.score=0;frame=0;
- matchMs=0;pointMs=0;paused=false;
+ matchMs=0;pointMs=0;matchStarted=false;paused=false;
  serveReset('red');running=true;
  $('overlay').hidden=true;$('settingsPanel').hidden=true;
  $('pauseBtn').textContent='⏸ Pause';
@@ -685,6 +689,7 @@ function collide(p){
  const limitX=10.7*(W/800);
  ball.vx=Math.max(-limitX,Math.min(limitX,vx));
  ball.vy=Math.max(-15,Math.min(9,vy));
+ if(awaitServe)matchStarted=true; // First actual serve contact, not Play button.
  awaitServe=false;rallyTicks=0;
  playTone(390);$('message').textContent='';
  return true;
@@ -1103,7 +1108,7 @@ function loop(now){
  let dt=Math.min(1.8,rawDelta/16.67||1);
  last=now;
  if(running&&!paused){
-  matchMs+=rawDelta;
+  if(matchStarted)matchMs+=rawDelta;
   if(!awaitServe)pointMs+=rawDelta;
   tick(dt);
   updateTimers();
