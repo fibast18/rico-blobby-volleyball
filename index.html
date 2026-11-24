@@ -748,7 +748,7 @@ function tick(dt){
    serveDelay+=dt;
    const offset=(blue.r+ball.r)*.58;
    aim=clampBlue(ball.x+offset);
-   if(serveDelay>32&&Math.abs(aim-blue.x)<17&&blue.y>=ground-.1&&cpuJumpCooldown===0){
+   if(serveDelay>32&&Math.abs(aim-blue.x)<28&&blue.y>=ground-.1&&cpuJumpCooldown===0){
      jump=true;cpuJumpCooldown=30;cpuJumpArmed=false;
    }
  }else if(!awaitServe){
