@@ -156,23 +156,73 @@ body.fullscreen .stage{width:100vw!important;height:100dvh!important;max-height:
 .settings-dialog .developer{font-size:12px;opacity:.8;margin:2px 0}
 @media(orientation:portrait){.stage .hud{align-items:flex-start}.left-hud{max-width:49%}.hud .buttons{max-width:49%;justify-content:flex-end}.clock{font-size:11px;padding:5px 7px}.hud .mini{font-size:11px!important;padding:5px 6px}}
 @media(orientation:landscape) and (max-height:480px){.stage .hud{top:max(5px,env(safe-area-inset-top,0px))}.clock,.hud .mini{min-height:28px;padding:5px 7px}.settings-dialog{gap:7px;padding:10px 16px}.settings-dialog h2{font-size:16px}}
+
+/* Tappable HUD clocks with a compact, scrollable match and rally history. */
+button.clock{border:1px solid #ffffff3b;appearance:none;-webkit-appearance:none;
+ cursor:pointer;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+button.clock:active{background:#1b6593}
+.stage .hud{z-index:8}
+.history-panel[hidden]{display:none!important}
+.history-panel{position:absolute;inset:0;z-index:12;display:flex;align-items:center;justify-content:center;
+ padding:max(12px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px))
+ max(16px,env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px));
+ background:#002943b8;backdrop-filter:blur(5px)}
+.history-dialog{width:min(465px,96%);height:min(530px,92%);display:flex;flex-direction:column;gap:9px;
+ background:#073b62f5;border:1px solid #ffffff40;border-radius:15px;box-shadow:0 16px 50px #00172c88;
+ padding:14px;min-height:0}
+.history-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.history-heading h2{margin:0;font-size:clamp(16px,3.5vw,21px)}
+#historyClose{border:0;border-radius:9px;background:#eaf3fd;color:#12374e;font:700 17px system-ui;
+ min-width:38px;min-height:35px;touch-action:manipulation}
+.history-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.history-tabs button{min-height:35px;border-radius:9px;background:#ffffff18;color:white;
+ border:1px solid #ffffff35;font:600 14px system-ui;touch-action:manipulation}
+.history-tabs button[aria-selected="true"]{background:#f6c957;color:#1d3a54;border-color:transparent}
+.history-summary{margin:0;font-size:12px;color:#d4e7f4}
+.history-items{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+ -webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:7px}
+.history-entry{border:1px solid #ffffff20;background:#ffffff0e;border-radius:9px;padding:9px 11px}
+.history-entry .entry-top{display:flex;gap:7px;justify-content:space-between;align-items:center}
+.history-entry strong{font-size:13px}
+.history-entry .duration{font-variant-numeric:tabular-nums;white-space:nowrap;color:#ffdf83;font-weight:750}
+.history-entry .entry-detail{color:#daebf6;font-size:11px;margin-top:4px}
+.history-empty{padding:26px 12px;text-align:center;color:#d7e6f1;font-size:13px}
+.history-note{margin:0;color:#c4daea;font-size:11px;text-align:center}
+@media(orientation:landscape) and (max-height:470px){
+ .history-dialog{height:98%;width:min(530px,89%);gap:6px;padding:9px 12px}
+ .history-entry{padding:6px 9px}
+ .history-tabs button{min-height:29px}
+ .history-heading h2{font-size:16px}
+}
 </style></head><body class="fullscreen"><main>
 <div id="stage" class="stage"><canvas id="game" width="800" height="500" aria-label="Red and blue blobs playing volleyball on a beach"></canvas>
 <div class="hud">
-  <div class="left-hud"><span id="status" class="mini" aria-live="polite">Ready</span><span class="clock" id="matchTimer" aria-label="Match timer">Match 00:00</span><span class="clock" id="pointTimer" aria-label="Point timer">Point 00:00</span></div>
+  <div class="left-hud"><span id="status" class="mini" aria-live="polite">Ready</span><button class="clock" id="matchTimer" type="button" aria-label="View match timer history" aria-haspopup="dialog">Match 00:00</button><button class="clock" id="pointTimer" type="button" aria-label="View point timer history" aria-haspopup="dialog">Point 00:00</button></div>
   <div class="buttons"><button id="restart" class="mini" type="button">↻ Restart</button><button id="pauseBtn" class="mini" type="button">⏸ Pause</button><button id="settingsButton" class="mini settings-gear" type="button" aria-label="Settings" aria-haspopup="dialog" aria-expanded="false">⚙</button></div>
 </div>
 <div id="message" class="message" hidden aria-live="polite"></div>
 <div class="controls" id="controls"><div class="control" id="movementPad" data-control="slide" role="slider" aria-label="Slide your finger left or right to move Red Blobby" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" tabindex="0"><span class="slide-track"><span class="slide-thumb" id="slideThumb"></span></span></div><button class="control" type="button" data-control="jump" aria-label="Jump anywhere on the right half of the court"></button></div>
 <div id="overlay" class="overlay"><div class="dialog"><h2 id="title">Ready to play?</h2><p id="detail">First to 15 points.</p><button id="start" type="button">▶ Play</button></div></div>
 <div id="settingsPanel" class="settings-panel" role="dialog" aria-modal="true" aria-label="Game settings" hidden><div class="settings-dialog">
-<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.3.0</small></p>
+<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.4.0</small></p>
 <label class="settings-field">Difficulty<select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label>
 <button id="sound" class="settings-action" type="button">🔊 Sound on</button>
 <button id="resetLearning" class="settings-action" type="button">🧠 Reset Blue AI</button>
 <p class="developer">Developed by: Engr. Rico J. Pono</p>
 <button id="closeSettings" class="settings-close" type="button">Close</button>
 </div></div>
+<div id="historyPanel" class="history-panel" role="dialog" aria-modal="true" aria-label="Timer history" hidden>
+ <div class="history-dialog">
+  <div class="history-heading"><h2 id="historyTitle">Time history</h2><button id="historyClose" type="button" aria-label="Close time history">✕</button></div>
+  <div class="history-tabs" role="tablist" aria-label="Time history type">
+   <button id="historyMatches" type="button" role="tab" aria-selected="true">Matches</button>
+   <button id="historyPoints" type="button" role="tab" aria-selected="false">Points</button>
+  </div>
+  <p id="historySummary" class="history-summary"></p>
+  <div id="historyItems" class="history-items" role="list"></div>
+  <p class="history-note">Saved on this device • Pause time excluded</p>
+ </div>
+</div>
 </div>
 <script>
 (()=>{'use strict';
