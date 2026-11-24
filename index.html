@@ -210,7 +210,7 @@ button.clock:active{background:#1b6593}
 <div id="overlay" class="overlay"><div class="dialog"><h2 id="title">Ready to play?</h2><p id="detail">First to 15 points.</p><button id="start" type="button">▶ Play</button></div></div>
 </div>
 <div id="settingsPanel" class="settings-panel" role="dialog" aria-modal="true" aria-label="Game settings" hidden><div class="settings-dialog">
-<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.5.0</small></p>
+<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.5.1</small></p>
 <label class="settings-field">Difficulty<select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label>
 <button id="sound" class="settings-action" type="button">🔊 Sound on</button>
 <button id="resetLearning" class="settings-action" type="button">🧠 Reset Blue AI</button>
@@ -642,33 +642,6 @@ function move(p,dir,jump,dt){
 // Choose an actual ball trajectory for Blue's volleyball swing.
 // This is shot selection, not a teleport or a free point: the outbound
 // speed obeys the same caps and still interacts with the real solid net.
-function chooseBlueReturn(x,y){
- const scale=W/800;
- const netClearX=netX-netHalf-ball.r-4;
- const marginY=netTop-ball.r-5;
- let best=null;
- for(const speed of [4.6,5.4,6.2,7,7.8,8.6,9.4,10.3]){
-  for(const rise of [9,10,11,12,13,14,15]){
-   const vx=-speed*scale,vy=-rise;
-   const sim={x,y,vx,vy,r:ball.r};
-   let cleared=false,landed=null,hitPost=false;
-   for(let t=0;t<95;t++){
-    advanceBall(sim,1);
-    if(sim.x<netClearX&&sim.y<marginY)cleared=true;
-    if(!cleared&&sim.vx>=0.5){hitPost=true;break}
-    if(sim.y+sim.r>=ground){landed=sim.x;break}
-   }
-   if(!cleared||hitPost||landed===null||landed>=netX-ball.r)continue;
-   // Choose a playable return landing in Red's half, not a huge
-   // off-screen lob. With the same physics, difficult low shots can fail.
-   const preferred=netX*.52;
-   const cost=Math.abs(landed-preferred)*.065
-     +Math.abs(speed-6.8)*.9+Math.abs(rise-11.3)*1.3;
-   if(!best||cost<best.cost)best={vx,vy,cost};
-  }
- }
- return best;
-}
 function collide(p){
  // The normal is determined by the ACTUAL point where the ball hits the
  // Blobby, never by which team owns it. Both players use identical physics.
@@ -704,13 +677,9 @@ function collide(p){
  const impulse=Math.max(7.7,Math.min(11.6,Math.hypot(relX,relY)*.75+3.2));
  let vx=reflectedX*.34+nx*impulse*1.18+p.vx*.27;
  let vy=reflectedY*.29+ny*impulse*.90+p.vy*.20-1.1;
- // Blue selects a physically valid cross-net trajectory, like a human
- // aiming a hit. The same speed limits, gravity and net apply to both.
- // Prevent repeated vertical juggling and unnecessary 3-touch faults.
- if(p===blue&&!awaitServe){
-  const shot=chooseBlueReturn(ball.x,ball.y);
-  if(shot){vx=shot.vx;vy=shot.vy}
- }
+ // No CPU-only ball-velocity overrides. Both players obey the SAME
+ // impact normal, incoming speed and movement momentum. A poor contact
+ // can bounce back to the hitter's own court or straight upward.
  if(awaitServe){vx+=p.vx*.18;vy-=1.3}
  const limitX=10.7*(W/800);
  ball.vx=Math.max(-limitX,Math.min(limitX,vx));
@@ -805,18 +774,33 @@ function tick(dt){
      const collisionY=blue.r*1.08+ball.r+2;
      const collisionX=blue.r*1.02+ball.r+2;
      const nearNetX=netX+blue.r*2.4;
-     // Favor survival over a fancy diagonal return. The learned bias is
-     // deliberately small so a learned preference cannot spoil coverage.
+     // Position to RECEIVE at an angle, not to control the outgoing
+     // ball artificially. A ball arriving on Blue's upper-left surface
+     // naturally reflects toward Red, while center/right impacts do not.
      let stand=null;
      for(const f of forecast){
        if(f.vy<0)continue;
        const dy=Math.abs(f.y-centerY);
        if(dy>collisionY*.90)continue;
        const toleranceX=collisionX*Math.sqrt(Math.max(0,1-(dy/collisionY)**2));
-       const bias=f.x<nearNetX?0:
-         clamp(5+learning.positionBias*adaptiveStrength*.15,-2,11);
-       const wanted=clampBlue(f.x+bias);
-       if(Math.abs(wanted-blue.x)>runSpeed*f.t+toleranceX*.80)continue;
+       // Aim ~half a body-width to the RIGHT of the incoming ball,
+       // creating a glancing hit on Blue's left shoulder. Near the net
+       // and on urgent shots, sacrifice angle to avoid missing entirely.
+       const idealOffset=clamp((blue.r+ball.r)*.48+
+         learning.positionBias*adaptiveStrength*.25,27,49);
+       const nearPost=f.x<nearNetX;
+       const urgent=f.t<15;
+       const space=clamp((f.x-blueMin)*.75,0,idealOffset);
+       const desired=nearPost?Math.min(idealOffset,space):idealOffset;
+       const offset=urgent?Math.min(desired,18):desired;
+       // Prefer a frame where the ball can actually touch the selected
+       // shoulder rather than a mathematically impossible early hit.
+       if(toleranceX<offset*.77&&!urgent)continue;
+       let wanted=clampBlue(f.x+offset);
+       if(Math.abs(wanted-blue.x)>runSpeed*f.t+toleranceX*.80){
+         wanted=clampBlue(f.x+Math.min(offset,12));
+         if(Math.abs(wanted-blue.x)>runSpeed*f.t+toleranceX*.80)continue;
+       }
        // First feasible body contact is the safest grounded interception.
        stand={t:f.t,target:wanted,x:f.x,y:f.y};
        break;
@@ -844,7 +828,8 @@ function tick(dt){
          const airCenter=feet-blue.r*1.05;
          const dy=Math.abs(f.y-airCenter);
          if(dy>collisionY*.50)continue;
-         const target=clampBlue(f.x+(f.x<nearNetX?0:8));
+         // An airborne angled hit still depends on the real contact normal.
+         const target=clampBlue(f.x+(f.x<nearNetX?15:38));
          if(Math.abs(target-blue.x)>runSpeed*f.t+collisionX*.26)continue;
          // Make sure this is a close, high-ball interception, not a
          // speculative leap from the opposite end of the court.
