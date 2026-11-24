@@ -37,6 +37,7 @@ jobs:
           node tests/blue-ai-regression.cjs
           node tests/net-and-touch-regression.cjs
           node tests/touch-slider-and-rally-regression.cjs
+          node tests/mobile-hud-and-timers-regression.cjs
           python3 - <<'PY'
           from pathlib import Path
           page = Path('index.html').read_text()
