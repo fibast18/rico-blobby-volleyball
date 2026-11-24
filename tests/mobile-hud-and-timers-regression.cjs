@@ -32,7 +32,7 @@ for(const name of ['matchTimer','pointTimer','pauseBtn','status']){
 }
 let clears=0;
 const state={
- running:true,paused:false,matchMs:0,pointMs:0,awaitServe:true,last:0,lastSnapshotMs:0,
+ running:true,paused:false,matchStarted:false,matchMs:0,pointMs:0,awaitServe:true,last:0,lastSnapshotMs:0,
  $:id=>elements[id],clearInput:()=>{clears++},
  heldJumpPointers:{clear:()=>{}},saveMatch:()=>{},
  resizeCourt:()=>{},tick:()=>{},draw:()=>{},
@@ -46,22 +46,28 @@ vm.runInContext('updateTimers()',state);
 assert.equal(elements.matchTimer.textContent,'Match 00:00');
 assert.equal(elements.pointTimer.textContent,'Point 00:00');
 vm.runInContext('loop(1000); loop(1100)',state);
-assert.equal(state.matchMs,100,'Match clock runs before serve');
+assert.equal(state.matchMs,0,'Match clock must stay at zero until the first real ball hit');
 assert.equal(state.pointMs,0,'Point clock waits for actual serve');
-state.awaitServe=false;
+// Even during an unserved game, pressing Play and waiting must not start it.
+state.matchStarted=true;state.awaitServe=false;
 vm.runInContext('loop(1200)',state);
-assert.equal(state.matchMs,200);
+assert.equal(state.matchMs,100,'First ball contact starts the match timer');
 assert.equal(state.pointMs,100);
 vm.runInContext('setPaused(true)',state);
 vm.runInContext('loop(1300); loop(1400)',state);
-assert.equal(state.matchMs,200,'Pausing freezes match timer');
+assert.equal(state.matchMs,100,'Pausing freezes match timer');
 assert.equal(state.pointMs,100,'Pausing freezes point timer');
 assert.equal(elements.pauseBtn.textContent,'▶ Resume');
 assert(clears>0,'Pause should release held touches');
 vm.runInContext('setPaused(false); loop(1500)',state);
-assert.equal(state.matchMs,300,'Resume continues match timer');
+assert.equal(state.matchMs,200,'Resume continues match timer');
 assert.equal(state.pointMs,200,'Resume continues point timer');
+assert(page.includes('if(awaitServe)matchStarted=true;'),'First contact must arm match clock');
+assert(page.includes('if(matchStarted)matchMs+=rawDelta;'),'Match clock must wait for first contact');
+assert(page.includes('matchMs,pointMs,matchStarted,server'),'Saved matches must preserve start state');
+assert(page.includes("typeof v.matchStarted==='boolean'?v.matchStarted:"),
+ 'Restored older matches must infer whether the clock had started');
 assert(page.includes('pointMs=0;scoreTimer=0;serveDelay=0;'),'Scoring must reset point clock');
 assert(page.includes('matchMs=0;pointMs=0;updateTimers();'),'Finished match must reset clocks');
-assert(page.includes('matchMs=0;pointMs=0;paused=false;'),'New match must reset clock and pause state');
+assert(page.includes('matchMs=0;pointMs=0;matchStarted=false;paused=false;'),'New match must reset start flag, clocks, and pause state');
 console.log('Phone full-screen HUD, pause/background, timers and settings checks passed.');
