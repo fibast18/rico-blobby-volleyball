@@ -300,6 +300,56 @@ function learnFromRally(result){
 }
 
 function playTone(freq){if(!sound)return;try{audio??=new(window.AudioContext||window.webkitAudioContext)();const o=audio.createOscillator(),g=audio.createGain();o.frequency.value=freq;o.type='sine';g.gain.setValueAtTime(.035,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+.09);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+.1)}catch{}}
+// Original Web Audio cues: referee-style match whistles and a short,
+// softer sound after EACH point. Sounds are generated on the device.
+function playRefereeWhistle(phase){
+ if(!sound)return;
+ try{
+  wakeAudio();
+  const context=audio;
+  if(!context)return;
+  const now=context.currentTime+.02;
+  const notes=phase==='start'?
+    [[0,.19,950,1230],[.24,.22,1080,1340]]:
+    [[0,.17,1250,980],[.23,.18,1180,940],[.46,.34,1120,870]];
+  for(const [delay,length,from,to] of notes){
+   const t=now+delay;
+   const osc=context.createOscillator();
+   const volume=context.createGain();
+   osc.type='sine';
+   osc.frequency.setValueAtTime(from,t);
+   osc.frequency.linearRampToValueAtTime(to,t+length*.83);
+   volume.gain.setValueAtTime(.0001,t);
+   volume.gain.linearRampToValueAtTime(.11,t+.018);
+   volume.gain.setValueAtTime(.11,t+length*.72);
+   volume.gain.exponentialRampToValueAtTime(.0001,t+length);
+   osc.connect(volume);volume.connect(context.destination);
+   osc.start(t);osc.stop(t+length+.008);
+  }
+ }catch{}
+}
+function playPointEndSound(winner){
+ if(!sound)return;
+ try{
+  wakeAudio();
+  const context=audio;
+  if(!context)return;
+  const t=context.currentTime+.012;
+  const notes=winner==='red'?[660,880]:[590,780];
+  notes.forEach((frequency,i)=>{
+   const start=t+i*.105;
+   const osc=context.createOscillator(),gain=context.createGain();
+   osc.type='sine';
+   osc.frequency.setValueAtTime(frequency,start);
+   osc.frequency.exponentialRampToValueAtTime(frequency*.92,start+.15);
+   gain.gain.setValueAtTime(.0001,start);
+   gain.gain.linearRampToValueAtTime(.07,start+.018);
+   gain.gain.exponentialRampToValueAtTime(.0001,start+.19);
+   osc.connect(gain);gain.connect(context.destination);
+   osc.start(start);osc.stop(start+.2);
+  });
+ }catch{}
+}
 function sandSound(impact){
  if(!sound)return;
  try{
@@ -529,6 +579,7 @@ function serveReset(side='red'){
 }
 function begin(){
  if(applyPendingUpdate())return;
+ playRefereeWhistle('start');
  if(running)recordMatchTime('restarted');
  clearSavedMatch();lastSnapshotMs=0;newMatchIdentity();
  updateLearningLabel();
@@ -544,6 +595,7 @@ function begin(){
 }
 function restart(){if(applyPendingUpdate())return;begin()}
 function finish(){
+ playRefereeWhistle('end');
  recordMatchTime('completed');
  running=false;paused=false;clearInput();clearSavedMatch();
  const finalScore=red.score+' : '+blue.score;
@@ -558,6 +610,7 @@ function finish(){
 function score(side){
  learnFromRally(side);
  if(side==='red')red.score++;else blue.score++;
+ playPointEndSound(side);
  recordPointTime(side);
  if(red.score>=15||blue.score>=15){finish();return}
  serveReset(side);updateTimers();saveMatch();
