@@ -210,7 +210,7 @@ button.clock:active{background:#1b6593}
 <div id="overlay" class="overlay"><div class="dialog"><h2 id="title">Ready to play?</h2><p id="detail">First to 15 points.</p><button id="start" type="button">▶ Play</button></div></div>
 </div>
 <div id="settingsPanel" class="settings-panel" role="dialog" aria-modal="true" aria-label="Game settings" hidden><div class="settings-dialog">
-<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.4.0</small></p>
+<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.4.1</small></p>
 <label class="settings-field">Difficulty<select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label>
 <button id="sound" class="settings-action" type="button">🔊 Sound on</button>
 <button id="resetLearning" class="settings-action" type="button">🧠 Reset Blue AI</button>
@@ -679,148 +679,103 @@ function tick(dt){
  frame+=dt;rallyTicks+=dt;touchLock=Math.max(0,touchLock-dt);
  move(red,slideTargetX===null?0:Math.sign(slideTargetX-red.x),pressed.jump,dt);
  const difficulty=$('difficulty').value;
- let dir=0,jump=false;
  const adaptiveStrength=difficulty==='easy'?.25:difficulty==='normal'?.65:1;
  cpuJumpCooldown=Math.max(0,cpuJumpCooldown-dt);
  const blueMin=netX+netHalf+blue.r,blueMax=W-blue.r;
- const offset=(blue.r+ball.r)*.59; // Off-center: contact the LEFT side of Blue to return left.
- const clampBlue=x=>Math.max(blueMin,Math.min(blueMax,x));
+ const clampBlue=x=>clamp(x,blueMin,blueMax);
+ const runSpeed=7.8*(W/800);
+ const home=clampBlue(netX+blue.r+30);
+ let dir=0,jump=false,aim=home;
  if(awaitServe&&server==='blue'){
-  // CPU serve: shuffle to the right of its own stationary ball before jumping.
-  serveDelay+=dt;
-  const serveTarget=clampBlue(ball.x+offset);
-  dir=serveTarget>blue.x+6?1:serveTarget<blue.x-6?-1:0;
-  if(serveDelay>32&&Math.abs(serveTarget-blue.x)<15&&blue.y>=ground-.1&&cpuJumpCooldown===0){
-   jump=true;cpuJumpCooldown=30;cpuJumpArmed=false;
-  }
+   // A serve is prepared without using automatic directed rebounds.
+   serveDelay+=dt;
+   const offset=(blue.r+ball.r)*.58;
+   aim=clampBlue(ball.x+offset);
+   if(serveDelay>32&&Math.abs(aim-blue.x)<17&&blue.y>=ground-.1&&cpuJumpCooldown===0){
+     jump=true;cpuJumpCooldown=30;cpuJumpArmed=false;
+   }
  }else if(!awaitServe){
-  // Intercept using the ball's actual approach. Previously Blue jumped
-  // while a short near-net ball was already falling below its airborne body.
-  const gravity=.35;
-  const onBlueSide=ball.x>=netX-ball.r||(ball.vx>0&&ball.x>netX-260);
-  const timeToY=y=>{
-    const disc=ball.vy*ball.vy+2*gravity*(y-ball.y);
-    if(disc<0)return 65;
-    return clamp((-ball.vy+Math.sqrt(disc))/gravity,0,65);
-  };
-  // A standing blob can already contact a ball just above ground.
-  const standingContactY=ground-blue.r*1.05-ball.r;
-  const contactT=timeToY(standingContactY);
-  const groundT=timeToY(ground-ball.r);
-  const reflectWall=x=>{
-    const lo=ball.r,hi=W-ball.r,span=hi-lo;
-    let u=(x-lo)%(span*2);if(u<0)u+=span*2;
-    return lo+(u>span?span*2-u:u);
-  };
-  let contactX=reflectWall(ball.x+ball.vx*contactT);
-  let groundX=reflectWall(ball.x+ball.vx*groundT);
-  // The net blocks low balls, so avoid forecasting that a ball can
-  // travel through the solid net below its top.
-  if(ball.x<netX&&ball.vx>0&&ball.y+ball.r>netTop-20){
-    contactX=netX+ball.r+netHalf;
-    groundX=contactX;
-  }
-  const nearNet=contactX<netX+blue.r*3||groundX<netX+blue.r*3;
-  const defensiveX=nearNet?Math.min(contactX,groundX):contactX;
-  // Aim for a playable interception first; angling is optional only
-  // once there is adequate time and distance from the net.
-  // Blue positions to the right of the incoming ball so the SAME
-  // angle-based physics naturally returns it left, instead of straight up.
-  const contactBias=clamp((blue.r+ball.r)*.48+learning.positionBias*adaptiveStrength,18,52);
-  const positionOffset=nearNet?Math.min(21,contactBias):contactBias;
-  let target=clampBlue(defensiveX+positionOffset);
-  if(cpuJumpPlan)target=clampBlue(cpuJumpPlan.target);
-  const tolerance=difficulty==='easy'?20:difficulty==='normal'?8:5;
-  if(onBlueSide){
-    dir=target>blue.x+tolerance?1:target<blue.x-tolerance?-1:0;
-  }else{
-    // Stand close enough to cover a shot landing just beyond the net.
-    const home=clampBlue(netX+blue.r+39);
-    dir=home>blue.x+18?1:home<blue.x-18?-1:0;
-  }
-  // Forward-simulate the visible ball, including real wall and net bounces.
-  // Choose a jump only if its arc will physically intersect the ball.
-  // This replaces the old almost-impossible height/timing condition.
-  const ballTooHighForStanding=ball.y<ground-blue.r*2.2-ball.r;
-  const standingCenterY=ground-blue.r*1.05;
-  const collisionX=blue.r*1.02+ball.r+2;
-  const collisionY=blue.r*1.08+ball.r+2;
-  const travelSpeed=7.8*(W/800);
-  const samples=[];
-  const simulated={x:ball.x,y:ball.y,vx:ball.vx,vy:ball.vy,r:ball.r};
-  for(let n=1;n<=48;n++){
-    advanceBall(simulated,1); // Identical swept net and wall collision physics.
-    if(simulated.y+ball.r>=ground)break;
-    if(simulated.x>netX-ball.r&&simulated.vx>=-.5){
-      samples.push({t:n,x:simulated.x,y:simulated.y});
-    }
-  }
-  // A low ball arriving just beyond the net must be met from the ground.
-  // Use the simulated future position instead of waiting until it is too late.
-  const imminentLowBall=samples.find(p=>p.t<=25&&p.x<netX+blue.r*3.0
-    &&p.y>ground-blue.r*2.65-ball.r&&p.y<ground-ball.r);
-  if(imminentLowBall){
-    const lowTarget=clampBlue(imminentLowBall.x+Math.min(20,positionOffset));
-    const emergencyTolerance=8;
-    dir=lowTarget>blue.x+emergencyTolerance?1:lowTarget<blue.x-emergencyTolerance?-1:0;
-  }
-  // The estimator only decides WHEN and WHERE Blue jumps. All collisions
-  // continue to use the exact same physics as the human-controlled Red.
-  if(!onBlueSide||ball.vx<-.5)cpuJumpPlan=null;
-  if(cpuJumpPlan&&(frame>cpuJumpPlan.expires||Math.abs(contactX-cpuJumpPlan.target)>collisionX*1.7))cpuJumpPlan=null;
-  if(onBlueSide&&cpuJumpArmed&&cpuJumpCooldown===0&&blue.y>=ground-.1&&!cpuJumpPlan){
-    let best=null;
-    for(const sample of samples){
-      if(sample.t<6||sample.t>40)continue;
-      const wantedX=clampBlue(sample.x+Math.min(nearNet?17:35,positionOffset));
-      const distanceX=Math.abs(wantedX-blue.x);
-      if(distanceX>travelSpeed*sample.t+collisionX*.45)continue;
-      // If a standing Blobby can meet a low shot, stay grounded.
-      if(Math.abs(sample.y-standingCenterY)<collisionY*.60)continue;
-      for(let delay=0;delay<=Math.min(16,sample.t-4);delay+=2){
-        const age=sample.t-delay;
-        const feet=ground-15.5*age+.265*age*(age+1);
-        if(feet>ground||feet<30)continue;
-        const centerY=feet-blue.r*1.05;
-        const verticalError=Math.abs(sample.y-centerY);
-        if(verticalError>collisionY*.72)continue;
-        const cost=sample.t*.38+verticalError*.23+delay*.14+
-          Math.max(0,distanceX-travelSpeed*sample.t)*.3;
-        if(!best||cost<best.cost)best={delay,t:sample.t,target:wantedX,cost};
-      }
-    }
-    if(best){
-      const learnedDelay=clamp(best.delay+learning.jumpBias*adaptiveStrength,0,18);
-      cpuJumpPlan={at:frame+learnedDelay,expires:frame+best.t+6,target:best.target,
-        offsetError:clamp(best.target-blue.x,-60,60),timingError:clamp(best.t-12,-15,15)};
-    }
-  }
-  if(cpuJumpPlan&&frame>=cpuJumpPlan.at&&cpuJumpCooldown===0&&cpuJumpArmed&&blue.y>=ground-.1&&onBlueSide){
-    jump=true;cpuJumpCooldown=36;cpuJumpArmed=false;
-    cpuAttempt={offsetError:cpuJumpPlan.offsetError,timingError:cpuJumpPlan.timingError};
-    cpuHadTouch=false;cpuJumpPlan=null;
-  }
-  // Steer toward the planned aerial contact immediately; don't keep chasing
-  // the later ground position while preparing to jump.
-  if(cpuJumpPlan&&onBlueSide&&!imminentLowBall){
-    const aim=clampBlue(cpuJumpPlan.target);
-    dir=aim>blue.x+tolerance?1:aim<blue.x-tolerance?-1:0;
-  }
-  // Only rearm after a new incoming volley, not while Blue is midair.
-  if(ball.x<netX-90&&ball.vx<=0&&blue.y>=ground-.1)cpuJumpArmed=true;
-  // Log a near-net defensive attempt even if the sensible action is
-  // staying grounded; learning then receives the missed-shot result.
-  if(onBlueSide&&nearNet&&!cpuAttempt&&ball.vy>0&&groundT<22){
-    cpuAttempt={offsetError:clamp(groundX-blue.x,-60,60),timingError:clamp(groundT-12,-15,15)};
-    cpuHadTouch=false;
-  }
+   // Ground and aerial defense share ONE forward simulation with the real
+   // ball/net physics. No fixed, pre-programmed hit direction is awarded.
+   const forecast=[];
+   const sim={x:ball.x,y:ball.y,vx:ball.vx,vy:ball.vy,r:ball.r};
+   for(let n=1;n<=64;n++){
+     advanceBall(sim,1);
+     if(sim.y+ball.r>=ground)break;
+     if(sim.x>=netX-ball.r && sim.x<=W-ball.r)
+       forecast.push({t:n,x:sim.x,y:sim.y,vy:sim.vy});
+   }
+   const approaching=ball.vx>-.25&&
+     (ball.x>=netX-ball.r || ball.x>netX-210&&ball.vx>0);
+   if(approaching&&forecast.length){
+     // The ball can already hit a grounded blob when its center reaches
+     // the upper part of the expanded body ellipse. Catch first, aim second.
+     const collisionY=blue.r*1.08+ball.r+2;
+     const headY=ground-blue.r*1.05;
+     const groundedY=headY-collisionY*.80;
+     const stand=forecast.find(f=>f.vy>=0 && f.y>=groundedY);
+     const nearNet=stand&&stand.x<netX+blue.r*2.4;
+     const offset=nearNet?0:
+       clamp(6+learning.positionBias*adaptiveStrength*.3,-3,17);
+     const standAim=stand?clampBlue(stand.x+offset):home;
+     // If a short, low shot is coming, stay on the sand. Jumping would
+     // cause Blue's body to pass over the ball (the recorded 15–0 failure).
+     const shortLow=Boolean(stand&&stand.t<=24&&
+       (ball.y>=groundedY-90 || nearNet));
+     aim=stand?standAim:home;
+     cpuJumpPlan=null;
+     // Only consider an aerial intercept AFTER the ball reaches the
+     // center area. The previous AI jumped while the ball was on Red's side.
+     const canJump=ball.x>=netX-ball.r*1.35 &&
+       ball.vx>=-.25 && !shortLow && blue.y>=ground-.1 &&
+       cpuJumpArmed && cpuJumpCooldown===0;
+     if(canJump){
+       const collisionX=blue.r*1.02+ball.r+2;
+       let best=null;
+       for(const f of forecast){
+         if(f.t<4||f.t>38||f.y>groundedY-8)continue;
+         const wanted=clampBlue(f.x+(f.x<netX+blue.r*2.4?0:10));
+         if(Math.abs(wanted-blue.x)>runSpeed*f.t+collisionX*.35)continue;
+         for(let age=4;age<=Math.min(27,f.t);age++){
+           const delay=f.t-age;
+           if(delay>20)continue;
+           const feet=ground-15.5*age+.265*age*(age+1);
+           if(feet>ground||feet<20)continue;
+           const predictedCenter=feet-blue.r*1.05;
+           const verticalError=Math.abs(f.y-predictedCenter);
+           if(verticalError>collisionY*.62)continue;
+           const cost=delay*.45+f.t*.16+verticalError*.11+
+             Math.abs(wanted-blue.x)*.025+Math.abs(age-11)*.2;
+           if(!best||cost<best.cost)best={cost,delay,target:wanted,t:f.t};
+         }
+       }
+       if(best && (!stand || stand.t>best.t+9)){
+         aim=best.target;
+         cpuJumpPlan={at:frame+best.delay,expires:frame+best.t+3,target:best.target};
+         if(best.delay<=1.15&&Math.abs(aim-blue.x)<runSpeed*2+blue.r*.55){
+           jump=true;cpuJumpCooldown=34;cpuJumpArmed=false;cpuJumpPlan=null;
+           cpuAttempt={offsetError:clamp(aim-blue.x,-60,60),
+             timingError:clamp(best.t-12,-15,15)};
+           cpuHadTouch=false;
+         }
+       }
+     }
+     // Grounded ball defense still produces an observable attempt for
+     // adaptive learning, rather than rewarding Blue for an arbitrary leap.
+     if(stand&&stand.t<24&&!cpuAttempt){
+       cpuAttempt={offsetError:clamp(stand.x-blue.x,-60,60),
+         timingError:clamp(stand.t-11,-15,15)};
+       cpuHadTouch=false;
+     }
+   }else{
+     // Reset at the net between returns, not at the far-right baseline.
+     cpuJumpPlan=null;
+     if(ball.x<netX-90&&ball.vx<=0&&blue.y>=ground-.1)
+       cpuJumpArmed=true;
+   }
  }
-
- // Record an observable failed interception if Blue does not reach a playable incoming ball.
- if(!awaitServe&&!cpuAttempt&&ball.x>netX+ball.r&&ball.vy>1&&ball.y>ground-160&&ball.y<ground-90){
-   cpuAttempt={offsetError:clamp(ball.x+offset-blue.x,-60,60),timingError:clamp((ground-ball.y)/Math.max(1,ball.vy)-10,-15,15)};
-   cpuHadTouch=false;
- }
+ const tolerance=difficulty==='easy'?24:difficulty==='normal'?8:5;
+ dir=aim>blue.x+tolerance?1:aim<blue.x-tolerance?-1:0;
  move(blue,dir,jump,dt);
  if(awaitServe){collide(server==='red'?red:blue);return}
  // The open sky has no ceiling. Swept substeps prevent passing through the net.
