@@ -31,7 +31,7 @@ const sandbox={
 vm.createContext(sandbox);
 vm.runInContext(between('function updateMovementTarget(clientX){','function updateMovementVisual(){'),sandbox);
 vm.runInContext(between('function move(p,dir,jump,dt){','function collide(p){'),sandbox);
-vm.runInContext(between('function chooseBlueReturn(x,y){','function tick(dt){'),sandbox);
+vm.runInContext(between('function collide(p){','function tick(dt){'),sandbox);
 vm.runInContext('updateMovementTarget(0)',sandbox);
 assert(Math.abs(sandbox.slideTargetX-sandbox.red.r)<.01,'Left edge should map to legal Red left boundary');
 vm.runInContext('updateMovementTarget(400)',sandbox);
