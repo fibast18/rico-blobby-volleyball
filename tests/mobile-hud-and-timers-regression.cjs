@@ -32,7 +32,7 @@ for(const name of ['matchTimer','pointTimer','pauseBtn','status']){
 }
 let clears=0;
 const state={
- running:true,paused:false,matchMs:0,pointMs:0,awaitServe:true,last:0,
+ running:true,paused:false,matchMs:0,pointMs:0,awaitServe:true,last:0,lastSnapshotMs:0,
  $:id=>elements[id],clearInput:()=>{clears++},
  heldJumpPointers:{clear:()=>{}},saveMatch:()=>{},
  resizeCourt:()=>{},tick:()=>{},draw:()=>{},
