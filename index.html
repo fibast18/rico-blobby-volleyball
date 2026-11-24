@@ -448,7 +448,7 @@ function saveMatch(){
  const snapshot={
   savedAt:Date.now(),W,red:pick(red),blue:pick(blue),ball:pick(ball),
   matchMs,pointMs,server,awaitServe,frame,rallyTicks,
-  lastVolleySide,consecutiveTouches
+  matchId,matchStartedAt,pointNumber,lastVolleySide,consecutiveTouches
  };
  try{localStorage.setItem(MATCH_KEY,JSON.stringify(snapshot))}catch{}
 }
@@ -475,6 +475,10 @@ function restoreSavedMatch(){
  ball.vy=clamp(Number(v.ball.vy)||0,-35,35);
  matchMs=clamp(Number(v.matchMs)||0,0,24*3600*1000);
  pointMs=clamp(Number(v.pointMs)||0,0,matchMs);
+ matchId=typeof v.matchId==='string'&&v.matchId.length<80?v.matchId:null;
+ if(!matchId)newMatchIdentity();
+ matchStartedAt=Number.isFinite(v.matchStartedAt)?v.matchStartedAt:Date.now()-matchMs;
+ pointNumber=Number.isFinite(v.pointNumber)?clamp(v.pointNumber,0,100):red.score+blue.score;
  frame=Number(v.frame)||0;rallyTicks=Number(v.rallyTicks)||0;
  server=v.server==='blue'?'blue':'red';awaitServe=Boolean(v.awaitServe);
  lastVolleySide=v.lastVolleySide==='red'||v.lastVolleySide==='blue'?v.lastVolleySide:null;
@@ -507,6 +511,7 @@ function setPaused(value){
  updateTimers();
 }
 function pauseOnExit(){
+ historyWasPlaying=false;
  if(running)setPaused(true);
 }
 function serveReset(side='red'){
@@ -519,7 +524,8 @@ function serveReset(side='red'){
 }
 function begin(){
  if(applyPendingUpdate())return;
- clearSavedMatch();lastSnapshotMs=0;
+ if(running)recordMatchTime('restarted');
+ clearSavedMatch();lastSnapshotMs=0;newMatchIdentity();
  updateLearningLabel();
  red.score=0;blue.score=0;frame=0;
  matchMs=0;pointMs=0;paused=false;
@@ -533,6 +539,7 @@ function begin(){
 }
 function restart(){if(applyPendingUpdate())return;begin()}
 function finish(){
+ recordMatchTime('completed');
  running=false;paused=false;clearInput();clearSavedMatch();
  const finalScore=red.score+' : '+blue.score;
  $('title').textContent=red.score>=15?'Red wins! 🎉':'Blue wins!';
@@ -546,6 +553,7 @@ function finish(){
 function score(side){
  learnFromRally(side);
  if(side==='red')red.score++;else blue.score++;
+ recordPointTime(side);
  if(red.score>=15||blue.score>=15){finish();return}
  serveReset(side);updateTimers();saveMatch();
  $('message').textContent=side==='red'?'Red scores — jump to serve':'Blue scores — opponent serves';
@@ -1109,6 +1117,17 @@ $('resetLearning').onclick=()=>{
  $('resetLearning').textContent='✓ Blue AI reset';
 };
 updateLearningLabel();
+$('matchTimer').onclick=()=>openTimeHistory('matches');
+$('pointTimer').onclick=()=>openTimeHistory('points');
+$('historyMatches').onclick=()=>showTimeHistory('matches');
+$('historyPoints').onclick=()=>showTimeHistory('points');
+$('historyClose').onclick=closeTimeHistory;
+$('historyPanel').addEventListener('pointerdown',e=>{
+ if(e.target===$('historyPanel'))closeTimeHistory()
+});
+document.addEventListener('keydown',e=>{
+ if(e.key==='Escape'&&!$('historyPanel').hidden)closeTimeHistory()
+});
 document.body.classList.add('fullscreen'); // Automatic app-sized viewport at launch.
 updateTimers();
 // Updates are checked on launch, resume and periodically, but never interrupt a match.
