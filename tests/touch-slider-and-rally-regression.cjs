@@ -15,7 +15,7 @@ assert(html.includes('width:50%!important;height:100%!important'),'Slider must c
 assert(html.includes('left:50%!important;right:0!important;top:0!important;bottom:0!important;'),'Jump must cover right half');
 
 const sandbox={
- W:800,netX:400,netHalf:7,ground:430,
+ W:800,netX:400,netHalf:7,netTop:262,ground:430,
  red:{x:195,y:430,vx:0,vy:0,r:49.45,jelly:0,jellyV:0,movePhase:0,hitCooldown:0},
  blue:{x:605,y:430,vx:0,vy:0,r:49.45,jelly:0,jellyV:0,movePhase:0,hitCooldown:0},
  ball:{x:0,y:0,vx:0,vy:5,r:36},
@@ -31,7 +31,7 @@ const sandbox={
 vm.createContext(sandbox);
 vm.runInContext(between('function updateMovementTarget(clientX){','function updateMovementVisual(){'),sandbox);
 vm.runInContext(between('function move(p,dir,jump,dt){','function collide(p){'),sandbox);
-vm.runInContext(between('function collide(p){','// Ball-versus-post collision:'),sandbox);
+vm.runInContext(between('function chooseBlueReturn(x,y){','function tick(dt){'),sandbox);
 vm.runInContext('updateMovementTarget(0)',sandbox);
 assert(Math.abs(sandbox.slideTargetX-sandbox.red.r)<.01,'Left edge should map to legal Red left boundary');
 vm.runInContext('updateMovementTarget(400)',sandbox);
