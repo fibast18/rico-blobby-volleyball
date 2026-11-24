@@ -320,6 +320,122 @@ function clearInput(){
  document.querySelectorAll('.control').forEach(b=>b.classList.remove('pressed'));
  updateMovementVisual();
 }
+// Per-device timer ledger. Only completed points are written, and a
+// finished/restarted match is recorded once. Saved times exclude pauses.
+const HISTORY_KEY='rico-blobby-time-history-v1';
+const HISTORY_MATCH_LIMIT=100,HISTORY_POINT_LIMIT=2400;
+function loadTimeHistory(){
+ try{
+  const value=JSON.parse(localStorage.getItem(HISTORY_KEY)||'null');
+  if(!value||!Array.isArray(value.matches)||!Array.isArray(value.points))
+   return {matches:[],points:[]};
+  return {matches:value.matches.slice(0,HISTORY_MATCH_LIMIT),
+          points:value.points.slice(0,HISTORY_POINT_LIMIT)};
+ }catch{return {matches:[],points:[]}}
+}
+let timeHistory=loadTimeHistory();
+let matchId=null,matchStartedAt=0,pointNumber=0;
+let historyView='matches',historyWasPlaying=false,historyPreviousFocus=null;
+function saveTimeHistory(){
+ try{localStorage.setItem(HISTORY_KEY,JSON.stringify(timeHistory))}catch{}
+}
+function newMatchIdentity(){
+ matchId=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9);
+ matchStartedAt=Date.now();pointNumber=0;
+}
+function recordPointTime(winner){
+ if(!matchId)newMatchIdentity();
+ pointNumber++;
+ const id=matchId+':'+pointNumber;
+ if(timeHistory.points.some(p=>p.id===id))return;
+ timeHistory.points.unshift({
+  id,matchId,number:pointNumber,winner,
+  redScore:red.score,blueScore:blue.score,
+  durationMs:Math.max(0,Math.round(pointMs)),
+  matchElapsedMs:Math.max(0,Math.round(matchMs)),at:Date.now()
+ });
+ timeHistory.points.length=Math.min(timeHistory.points.length,HISTORY_POINT_LIMIT);
+ saveTimeHistory();
+}
+function recordMatchTime(status){
+ if(!matchId||(!red.score&&!blue.score&&matchMs<1000))return;
+ if(timeHistory.matches.some(m=>m.id===matchId))return;
+ const winner=status==='completed'?(red.score>blue.score?'red':'blue'):null;
+ timeHistory.matches.unshift({
+  id:matchId,at:Date.now(),startedAt:matchStartedAt,
+  durationMs:Math.max(0,Math.round(matchMs)),
+  redScore:red.score,blueScore:blue.score,points:pointNumber,
+  status,winner
+ });
+ timeHistory.matches.length=Math.min(timeHistory.matches.length,HISTORY_MATCH_LIMIT);
+ saveTimeHistory();
+}
+function historyDate(at){
+ const date=new Date(at);
+ return Number.isFinite(date.getTime())?
+   date.toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',
+     hour:'numeric',minute:'2-digit'}):'Date unavailable';
+}
+function historyRow(title,duration,detail){
+ const row=document.createElement('div');row.className='history-entry';
+ row.setAttribute('role','listitem');
+ const top=document.createElement('div');top.className='entry-top';
+ const heading=document.createElement('strong');heading.textContent=title;
+ const time=document.createElement('span');time.className='duration';time.textContent=clockText(duration);
+ top.append(heading,time);
+ const subtitle=document.createElement('div');subtitle.className='entry-detail';
+ subtitle.textContent=detail;
+ row.append(top,subtitle);
+ return row;
+}
+function showTimeHistory(view){
+ historyView=view==='points'?'points':'matches';
+ $('historyMatches').setAttribute('aria-selected',String(historyView==='matches'));
+ $('historyPoints').setAttribute('aria-selected',String(historyView==='points'));
+ $('historyTitle').textContent=historyView==='matches'?'Match history':'Point history';
+ const items=$('historyItems');items.replaceChildren();
+ const entries=timeHistory[historyView];
+ const total=entries.length;
+ $('historySummary').textContent=historyView==='matches'?
+   total+' recorded match'+(total===1?'':'es')+' • newest first':
+   total+' recorded point'+(total===1?'':'s')+' • newest first';
+ if(!total){
+  const empty=document.createElement('p');empty.className='history-empty';
+  empty.textContent=historyView==='matches'?
+   'No matches recorded yet. Finish a match to see its time here.':
+   'No points recorded yet. Each scored rally will appear here.';
+  items.append(empty);return;
+ }
+ for(const entry of entries){
+  if(historyView==='matches'){
+   const result=entry.status==='completed'?
+    (entry.winner==='red'?'Red won':'Blue won'):'Restarted';
+   items.append(historyRow(result+' • '+entry.redScore+':'+entry.blueScore,
+    entry.durationMs,historyDate(entry.at)+' • '+entry.points+' point'+(entry.points===1?'':'s')));
+  }else{
+   const team=entry.winner==='red'?'Red':'Blue';
+   items.append(historyRow('Point '+entry.number+' • '+team,
+    entry.durationMs,historyDate(entry.at)+' • Score '+entry.redScore+':'+entry.blueScore));
+  }
+ }
+}
+function openTimeHistory(view){
+ if(!$('historyPanel').hidden)return;
+ historyPreviousFocus=document.activeElement;
+ historyWasPlaying=running&&!paused;
+ if(running)setPaused(true);
+ showTimeHistory(view);
+ $('historyPanel').hidden=false;
+ $('historyClose').focus();
+}
+function closeTimeHistory(){
+ if($('historyPanel').hidden)return;
+ $('historyPanel').hidden=true;
+ if(historyWasPlaying&&running)setPaused(false);
+ historyWasPlaying=false;
+ if(historyPreviousFocus&&typeof historyPreviousFocus.focus==='function')
+  historyPreviousFocus.focus();
+}
 // Match clock runs for the whole race to 15; the point clock runs only
 // after a serve, resets after every point, and both freeze while paused.
 // Keep a paused match recoverable if iOS unloads the Home Screen app.
