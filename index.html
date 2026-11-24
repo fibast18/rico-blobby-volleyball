@@ -292,7 +292,7 @@ function move(p,dir,jump,dt){
  if(p===red&&slideTargetX!==null){
   const maxSpeed=9.6*(W/800);
   p.vx=clamp((slideTargetX-p.x)/Math.max(dt,.15),-maxSpeed,maxSpeed);
- }else p.vx=dir*6.6*(W/800);
+ }else p.vx=dir*(p===blue?7.8:6.6)*(W/800);
  p.x+=p.vx*dt;
  p.hitCooldown=Math.max(0,p.hitCooldown-dt);
  if(Math.abs(p.vx)>.3&&p.y>=ground-.1){p.movePhase+=dt*.29;p.jellyV+=Math.sin(p.movePhase*2)*.006*dt}
@@ -386,6 +386,20 @@ function resolveNetCollision(body){
  }
  return true;
 }
+// Move in small swept substeps so high-speed balls cannot tunnel
+// through either the net's top or its vertical sides.
+function advanceBall(body,dt=1){
+ const speed=Math.max(Math.abs(body.vx),Math.abs(body.vy)+.35*dt);
+ const stepCount=Math.max(1,Math.ceil(speed*dt/(body.r*.30)));
+ const step=dt/stepCount;
+ for(let n=0;n<stepCount;n++){
+  body.vy+=.35*step;
+  body.x+=body.vx*step;body.y+=body.vy*step;
+  if(body.x<body.r){body.x=body.r;body.vx=Math.abs(body.vx)*.9}
+  if(body.x>W-body.r){body.x=W-body.r;body.vx=-Math.abs(body.vx)*.9}
+  resolveNetCollision(body);
+ }
+}
 function tick(dt){
  frame+=dt;rallyTicks+=dt;touchLock=Math.max(0,touchLock-dt);
  move(red,slideTargetX===null?0:Math.sign(slideTargetX-red.x),pressed.jump,dt);
@@ -456,19 +470,24 @@ function tick(dt){
   const standingCenterY=ground-blue.r*1.05;
   const collisionX=blue.r*1.02+ball.r+2;
   const collisionY=blue.r*1.08+ball.r+2;
-  const travelSpeed=6.6*(W/800);
+  const travelSpeed=7.8*(W/800);
   const samples=[];
   const simulated={x:ball.x,y:ball.y,vx:ball.vx,vy:ball.vy,r:ball.r};
   for(let n=1;n<=48;n++){
-    simulated.vy+=gravity;
-    simulated.x+=simulated.vx;simulated.y+=simulated.vy;
-    if(simulated.x<ball.r){simulated.x=ball.r;simulated.vx=Math.abs(simulated.vx)*.9}
-    if(simulated.x>W-ball.r){simulated.x=W-ball.r;simulated.vx=-Math.abs(simulated.vx)*.9}
-    resolveNetCollision(simulated); // Match real net contact angle in CPU planning.
+    advanceBall(simulated,1); // Identical swept net and wall collision physics.
     if(simulated.y+ball.r>=ground)break;
     if(simulated.x>netX-ball.r&&simulated.vx>=-.5){
       samples.push({t:n,x:simulated.x,y:simulated.y});
     }
+  }
+  // A low ball arriving just beyond the net must be met from the ground.
+  // Use the simulated future position instead of waiting until it is too late.
+  const imminentLowBall=samples.find(p=>p.t<=25&&p.x<netX+blue.r*3.0
+    &&p.y>ground-blue.r*2.65-ball.r&&p.y<ground-ball.r);
+  if(imminentLowBall){
+    const lowTarget=clampBlue(imminentLowBall.x+Math.min(20,positionOffset));
+    const emergencyTolerance=8;
+    dir=lowTarget>blue.x+emergencyTolerance?1:lowTarget<blue.x-emergencyTolerance?-1:0;
   }
   // The estimator only decides WHEN and WHERE Blue jumps. All collisions
   // continue to use the exact same physics as the human-controlled Red.
@@ -508,7 +527,7 @@ function tick(dt){
   }
   // Steer toward the planned aerial contact immediately; don't keep chasing
   // the later ground position while preparing to jump.
-  if(cpuJumpPlan&&onBlueSide){
+  if(cpuJumpPlan&&onBlueSide&&!imminentLowBall){
     const aim=clampBlue(cpuJumpPlan.target);
     dir=aim>blue.x+tolerance?1:aim<blue.x-tolerance?-1:0;
   }
@@ -529,12 +548,9 @@ function tick(dt){
  }
  move(blue,dir,jump,dt);
  if(awaitServe){collide(server==='red'?red:blue);return}
- ball.vy+=.35*dt;ball.x+=ball.vx*dt;ball.y+=ball.vy*dt;
+ // The open sky has no ceiling. Swept substeps prevent passing through the net.
+ advanceBall(ball,dt);
  if(!Number.isFinite(ball.x)||!Number.isFinite(ball.y)||Math.abs(ball.y)>5000){serveReset(server);return}
- if(ball.x<ball.r){ball.x=ball.r;ball.vx=Math.abs(ball.vx)*.9}
- if(ball.x>W-ball.r){ball.x=W-ball.r;ball.vx=-Math.abs(ball.vx)*.9}
- // Open sky: the ball can rise beyond the visible court and return under gravity.
- resolveNetCollision(ball);
  collide(red);collide(blue);
  if(touchFault){
    const fouled=touchFault;touchFault=null;
