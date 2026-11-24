@@ -28,7 +28,7 @@ const side=collide({x:359,y:300,vx:5,vy:.5});
 assert(side.hit&&side.ball.vx<0,'Post side should reflect ball laterally');
 const clear=collide({x:610,y:140,vx:-2,vy:6});
 assert(!clear.hit&&clear.ball.vy===6,'Distant ball must not be deflected');
-assert(html.includes('advanceBall(simulated,1)'),'CPU forecast must use swept net collisions');
+assert(html.includes('advanceBall(sim,1)'),'CPU forecast must use the same swept net collisions as the real ball');
 assert(html.includes('advanceBall(ball,dt)'),'Real ball must use swept net collisions');
 const speedTest={x:330,y:325,vx:155,vy:0,r:36};
 physics.fastBall=speedTest;
