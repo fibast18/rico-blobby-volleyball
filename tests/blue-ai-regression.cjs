@@ -36,6 +36,22 @@ function scenario({x,y,vx,vy,blueX=605,frames=25,learned=0}){
  }
  return {ctx,trace};
 }
+// Ready posture: the whole right half's midpoint is the waiting position.
+// Previous versions wandered directly toward the net before Red served.
+assert(page.includes('blue.x=(netX+W)*.5;blue.y=ground'),
+ 'Each point must start with Blue in the exact middle of its court');
+const idle=scenario({x:190,y:260,vx:0,vy:0,blueX:600,frames:5});
+assert(idle.trace.every(row=>Math.abs(row.blueX-600)<.01),
+ 'Blue must not preemptively camp at the net with the ball at rest');
+
+// High lobs sent toward Blue while it is at center: it must defend,
+// rather than jumping early and allowing a ball to drop behind it.
+const incoming=scenario({x:448,y:245,vx:6,vy:3,blueX:600,frames:24});
+assert(incoming.ctx.cpuHadTouch,
+ 'Center-court Blue must return an ordinary descending ball headed right');
+assert(incoming.trace.filter(row=>row.jumped).length===0,
+ 'A routine descending ball should not trigger the recorded overjump');
+
 const lowNet=scenario({x:465,y:282,vx:3,vy:3,blueX:605,frames:25});
 assert(lowNet.ctx.cpuHadTouch,
  'Blue must intercept a reachable low incoming ball near the net (recorded failure)');
