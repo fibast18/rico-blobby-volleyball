@@ -180,7 +180,7 @@ const $=id=>document.getElementById(id),stage=$('stage'),canvas=$('game'),ctx=ca
 let W=800,netX=400;const H=500,ground=430,netTop=262,netHalf=7;
 const red={x:195,y:ground,vy:0,vx:0,r:49.45,score:0,jelly:0,jellyV:0,movePhase:0,hitCooldown:0,movePhase:0,hitCooldown:0},blue={x:605,y:ground,vy:0,vx:0,r:49.45,score:0,jelly:0,jellyV:0};
 const ball={x:195,y:260,vx:0,vy:0,r:36};
-let running=false,awaitServe=true,last=0,frame=0,sound=true,audio=null,scoreTimer=0,server='red',serveDelay=0,rallyTicks=0,lastTouch=null,touchLock=0,cpuJumpCooldown=0,cpuJumpArmed=true,cpuJumpPlan=null;
+let running=false,paused=false,matchMs=0,pointMs=0,awaitServe=true,last=0,frame=0,sound=true,audio=null,scoreTimer=0,server='red',serveDelay=0,rallyTicks=0,lastTouch=null,touchLock=0,cpuJumpCooldown=0,cpuJumpArmed=true,cpuJumpPlan=null;
 const pressed={jump:false};
 let slidePointerId=null,slideTargetX=null;
 let lastVolleySide=null,consecutiveTouches=0,touchFault=null;
@@ -270,22 +270,68 @@ function clearInput(){
  document.querySelectorAll('.control').forEach(b=>b.classList.remove('pressed'));
  updateMovementVisual();
 }
+// Match clock runs for the whole race to 15; the point clock runs only
+// after a serve, resets after every point, and both freeze while paused.
+function clockText(ms){
+ const seconds=Math.floor(ms/1000);
+ return String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0');
+}
+function updateTimers(){
+ const match='Match '+clockText(matchMs),point='Point '+clockText(pointMs);
+ if($('matchTimer').textContent!==match)$('matchTimer').textContent=match;
+ if($('pointTimer').textContent!==point)$('pointTimer').textContent=point;
+}
+function setPaused(value){
+ if(!running)return;
+ paused=Boolean(value);
+ if(paused){clearInput();heldJumpPointers.clear()}
+ $('status').textContent=paused?'Paused':'Playing';
+ $('pauseBtn').textContent=paused?'▶ Resume':'⏸ Pause';
+ $('pauseBtn').setAttribute('aria-pressed',String(paused));
+ // The current match, point, scores and AI state stay exactly as they were.
+ updateTimers();
+}
+function pauseOnExit(){
+ if(running)setPaused(true);
+}
 function serveReset(side='red'){
  server=side;cpuAttempt=null;cpuHadTouch=false;lastVolleySide=null;consecutiveTouches=0;touchFault=null;
  red.x=W*.245;red.y=ground;red.vx=0;red.vy=0;red.jelly=0;red.jellyV=0;red.movePhase=0;red.hitCooldown=0;
  blue.x=W*.755;blue.y=ground;blue.vx=0;blue.vy=0;blue.jelly=0;blue.jellyV=0;blue.movePhase=0;blue.hitCooldown=0;
  ball.x=side==='red'?red.x:blue.x;
- ball.y=ground-170;ball.vx=0;ball.vy=0;awaitServe=true;scoreTimer=0;serveDelay=0;rallyTicks=0;lastTouch=null;touchLock=0;cpuJumpCooldown=0;cpuJumpArmed=true;cpuJumpPlan=null;clearInput();
+ ball.y=ground-170;ball.vx=0;ball.vy=0;awaitServe=true;pointMs=0;scoreTimer=0;serveDelay=0;rallyTicks=0;lastTouch=null;touchLock=0;cpuJumpCooldown=0;cpuJumpArmed=true;cpuJumpPlan=null;clearInput();
  $('message').textContent=side==='red'?'Jump to serve from your court':'Blue serves next';
 }
-function begin(){if(applyPendingUpdate())return;updateLearningLabel();red.score=0;blue.score=0;frame=0;serveReset('red');running=true;$('overlay').hidden=true;$('status').textContent='Playing'}
+function begin(){
+ if(applyPendingUpdate())return;
+ updateLearningLabel();
+ red.score=0;blue.score=0;frame=0;
+ matchMs=0;pointMs=0;paused=false;
+ serveReset('red');running=true;
+ $('overlay').hidden=true;$('settingsPanel').hidden=true;
+ $('pauseBtn').textContent='⏸ Pause';
+ $('pauseBtn').setAttribute('aria-pressed','false');
+ $('settingsButton').setAttribute('aria-expanded','false');
+ $('status').textContent='Playing';
+ updateTimers();
+}
 function restart(){if(applyPendingUpdate())return;begin()}
-function finish(){running=false;clearInput();$('title').textContent=(red.score>=15?'Red wins! 🎉':'Blue wins!');$('detail').textContent='Final score '+red.score+' : '+blue.score+'. Tap Play Again for a fresh match.';$('start').textContent='↻ Play Again';$('overlay').hidden=false;$('status').textContent='Match over'}
+function finish(){
+ running=false;paused=false;clearInput();
+ const finalScore=red.score+' : '+blue.score;
+ $('title').textContent=red.score>=15?'Red wins! 🎉':'Blue wins!';
+ $('detail').textContent='Final score '+finalScore;
+ $('start').textContent='↻ Play Again';
+ $('overlay').hidden=false;
+ $('status').textContent='Finished';
+ $('pauseBtn').textContent='⏸ Pause';
+ matchMs=0;pointMs=0;updateTimers();
+}
 function score(side){
  learnFromRally(side);
  if(side==='red')red.score++;else blue.score++;
  if(red.score>=15||blue.score>=15){finish();return}
- serveReset(side);
+ serveReset(side);updateTimers();
  $('message').textContent=side==='red'?'Red scores — jump to serve':'Blue scores — opponent serves';
 }
 function move(p,dir,jump,dt){
@@ -755,7 +801,20 @@ function resizeCourt(){
 }
 window.addEventListener('resize',resizeCourt);
 if(window.visualViewport)window.visualViewport.addEventListener('resize',resizeCourt);
-function loop(now){resizeCourt();let dt=Math.min(1.8,(now-last)/16.67||1);last=now;if(running)tick(dt);draw();requestAnimationFrame(loop)}
+function loop(now){
+ resizeCourt();
+ const rawDelta=last?Math.max(0,Math.min(100,now-last)):0;
+ let dt=Math.min(1.8,rawDelta/16.67||1);
+ last=now;
+ if(running&&!paused){
+  matchMs+=rawDelta;
+  if(!awaitServe)pointMs+=rawDelta;
+  tick(dt);
+  updateTimers();
+ }
+ draw();
+ requestAnimationFrame(loop);
+}
 const movementPad=$('movementPad');
 movementPad.addEventListener('pointerdown',e=>{
  e.preventDefault();wakeAudio();
@@ -807,15 +866,34 @@ for(const type of ['pointerup','pointercancel','lostpointercapture']){
 ['contextmenu','selectstart','dragstart'].forEach(type=>stage.addEventListener(type,e=>e.preventDefault(),{passive:false}));
 stage.addEventListener('touchstart',e=>{if(e.target.closest('[data-control]'))e.preventDefault()},{passive:false});
 stage.addEventListener('touchmove',e=>{if(e.target.closest('[data-control]'))e.preventDefault()},{passive:false});
-window.addEventListener('blur',()=>{heldJumpPointers.clear();clearInput()});document.addEventListener('visibilitychange',()=>{if(document.hidden){heldJumpPointers.clear();clearInput()}});
-$('start').onclick=()=>{wakeAudio();begin()};$('restart').onclick=restart;$('outsideReset').onclick=restart;
-$('sound').onclick=()=>{sound=!sound;$('sound').textContent=sound?'🔊 Sound':'🔇 Muted'};
-$('resetLearning').onclick=()=>{learning=freshLearning();saveLearning();cpuAttempt=null;cpuHadTouch=false;updateLearningLabel();$('status').textContent='AI learning reset'};
+window.addEventListener('blur',pauseOnExit);
+window.addEventListener('pagehide',pauseOnExit);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)pauseOnExit()});
+$('start').onclick=()=>{wakeAudio();begin()};
+$('restart').onclick=restart;
+$('pauseBtn').onclick=()=>{wakeAudio();setPaused(!paused)};
+$('settingsButton').onclick=()=>{
+ setPaused(true);
+ $('settingsPanel').hidden=false;
+ $('settingsButton').setAttribute('aria-expanded','true');
+ $('closeSettings').focus();
+};
+function closeSettings(){
+ $('settingsPanel').hidden=true;
+ $('settingsButton').setAttribute('aria-expanded','false');
+ $('settingsButton').focus();
+}
+$('closeSettings').onclick=closeSettings;
+$('settingsPanel').addEventListener('pointerdown',e=>{if(e.target===$('settingsPanel'))closeSettings()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('settingsPanel').hidden)closeSettings()});
+$('sound').onclick=()=>{sound=!sound;$('sound').textContent=sound?'🔊 Sound on':'🔇 Sound off'};
+$('resetLearning').onclick=()=>{
+ learning=freshLearning();saveLearning();cpuAttempt=null;cpuHadTouch=false;updateLearningLabel();
+ $('resetLearning').textContent='✓ Blue AI reset';
+};
 updateLearningLabel();
-function updateFull(){const active=document.body.classList.contains('fullscreen');$('fullscreen').textContent=active?'✕ Exit':'⛶ Expand';$('outsideFull').textContent=active?'✕ Exit':'⛶ Fullscreen'}
-async function toggleFull(){if(document.body.classList.contains('fullscreen')){document.body.classList.remove('fullscreen');if(document.fullscreenElement)try{await document.exitFullscreen()}catch{};updateFull();return}document.body.classList.add('fullscreen');if(stage.requestFullscreen)try{await stage.requestFullscreen({navigationUI:'hide'})}catch{};updateFull()}
-$('fullscreen').onclick=toggleFull;$('outsideFull').onclick=toggleFull;
-document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&document.body.classList.contains('fullscreen')&&document.fullscreenEnabled){document.body.classList.remove('fullscreen')}updateFull()});
+document.body.classList.add('fullscreen'); // Automatic app-sized viewport at launch.
+updateTimers();
 // Updates are checked on launch, resume and periodically, but never interrupt a match.
 const APP_VERSION='1.8.0';
 let pendingVersion=null,checkingUpdate=false,lastUpdateCheck=0;
