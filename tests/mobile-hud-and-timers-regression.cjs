@@ -23,6 +23,8 @@ assert(page.includes("document.addEventListener('visibilitychange',()=>{if(docum
  'App backgrounding must pause the match');
 assert(page.includes("window.addEventListener('pagehide',pauseOnExit)"),
  'Leaving the game must pause it');
+assert(page.includes('function saveMatch()')&&page.includes('function restoreSavedMatch()'),'Paused match must survive iOS app unload');
+assert(page.includes('restoreSavedMatch();requestAnimationFrame(loop);'),'Game should restore a paused match automatically on launch');
 
 const elements={};
 for(const name of ['matchTimer','pointTimer','pauseBtn','status']){
@@ -32,7 +34,7 @@ let clears=0;
 const state={
  running:true,paused:false,matchMs:0,pointMs:0,awaitServe:true,last:0,
  $:id=>elements[id],clearInput:()=>{clears++},
- heldJumpPointers:{clear:()=>{}},
+ heldJumpPointers:{clear:()=>{}},saveMatch:()=>{},
  resizeCourt:()=>{},tick:()=>{},draw:()=>{},
  requestAnimationFrame:()=>{},updateTimers:undefined
 };
