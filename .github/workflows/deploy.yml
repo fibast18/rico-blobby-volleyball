@@ -43,6 +43,7 @@ jobs:
           node tests/mobile-hud-and-timers-regression.cjs
           node tests/iphone-landscape-viewport-regression.cjs
           node tests/iphone-top-controls-regression.cjs
+          node tests/player-name-regression.cjs
           node tests/timer-history-regression.cjs
           python3 - <<'PY'
           from pathlib import Path
