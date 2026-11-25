@@ -15,6 +15,8 @@ assert(modal.includes('id="wifiRematch"')&&modal.includes('hidden'),
 assert(html.includes("id='not real'")===false);
 assert(html.includes("if(localMode==='ai'&&applyPendingUpdate())return"),
  'Local rematch must never reload the app and discard the Wi-Fi connection');
+assert(html.includes("if(LocalWifi.connected){\n   $('status').textContent='Update ready';"),
+ 'Background PWA updates must not reload a paired phone between matches');
 assert(html.includes("setLocalRematchAvailable(localMode==='host'&&LocalWifi.connected)"),
  'Host finish screen must offer replay without pairing');
 assert(html.includes("setLocalRematchAvailable(LocalWifi.connected)"),
