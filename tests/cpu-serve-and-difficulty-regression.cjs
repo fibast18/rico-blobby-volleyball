@@ -49,7 +49,7 @@ function defend(mode,frames=5){
  const red={x:195,y:430,vx:0,vy:0,r:49.45,jelly:0,jellyV:0,movePhase:0,hitCooldown:0,score:0};
  const blue={x:670,y:430,vx:0,vy:0,r:49.45,jelly:0,jellyV:0,movePhase:0,hitCooldown:0,score:0};
  const ball={x:420,y:190,vx:5,vy:1,r:36};
- const s={W:800,netX:400,netHalf:7,netTop:262,ground:430,red,blue,ball,
+ const s={localMode:'ai',W:800,netX:400,netHalf:7,netTop:262,ground:430,red,blue,ball,
   frame:0,rallyTicks:0,touchLock:0,pressed:{jump:false},slideTargetX:null,
   awaitServe:false,server:'red',serveDelay:0,
   cpuJumpCooldown:0,cpuJumpArmed:true,cpuJumpPlan:null,
