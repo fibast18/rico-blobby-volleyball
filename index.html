@@ -403,6 +403,7 @@ body.fullscreen #stage .hud button:is(:active,.tapping){
  background:#eaf5ff;color:#1b3347;border-radius:7px;padding:5px;resize:vertical}
 .wifi-text-fallback button{margin:4px 0}
 body.fullscreen #stage .hud .left-hud,body.fullscreen #stage .hud .buttons{max-width:48%}
+#playerNameButton.blue-local{left:89%!important}
 @media(max-width:590px),(max-height:380px){
  .wifi-dialog{grid-template-columns:minmax(0,1fr) minmax(95px,32%);padding:8px;gap:5px}
  .wifi-heading h2{font-size:15px}
@@ -511,6 +512,7 @@ function savePlayerName(value){
  playerName=normalizePlayerName(value);
  try{localStorage.setItem(PLAYER_NAME_KEY,playerName)}catch{}
  $('playerNameButton').textContent=playerName;
+ if(localMode!=='ai')LocalWifi.send({t:'hello',name:playerName});
 }
 function openPlayerNameEditor(){
  if(!$('playerNamePanel').hidden)return;
@@ -538,14 +540,18 @@ function updateMovementTarget(clientX,clientY){
  const length=rotated?rect.height:rect.width;
  const fraction=clamp(position/(length*.5),0,1);
  // Map the left 50% of the physical touchscreen to the legal Red court.
- slideTargetX=red.r+fraction*(netX-netHalf-2*red.r);
+ slideTargetX=localMode==='guest'?
+   (netX+netHalf+blue.r)+fraction*(W-netX-netHalf-2*blue.r):
+   red.r+fraction*(netX-netHalf-2*red.r);
  const slider=$('movementPad');
  slider.setAttribute('aria-valuenow',String(Math.round(fraction*100)));
 }
 function updateMovementVisual(){
  const thumb=$('slideThumb');
  if(!thumb)return;
- const fraction=clamp((red.x-red.r)/(netX-netHalf-2*red.r),0,1);
+ const fraction=localMode==='guest'?
+   clamp((blue.x-netX-netHalf-blue.r)/(W-netX-netHalf-2*blue.r),0,1):
+   clamp((red.x-red.r)/(netX-netHalf-2*red.r),0,1);
  thumb.style.left=(fraction*100)+'%';
  if(slidePointerId===null)
    $('movementPad').setAttribute('aria-valuenow',String(Math.round(fraction*100)));
@@ -793,7 +799,7 @@ const MATCH_KEY='rico-blobby-current-match-v1';
 let lastSnapshotMs=0;
 function clearSavedMatch(){try{localStorage.removeItem(MATCH_KEY)}catch{}}
 function saveMatch(){
- if(!running)return;
+ if(!running||localMode!=='ai')return;
  const pick=p=>({x:p.x,y:p.y,vx:p.vx,vy:p.vy,score:p.score});
  const snapshot={
   savedAt:Date.now(),W,red:pick(red),blue:pick(blue),ball:pick(ball),
@@ -856,6 +862,9 @@ function updateTimers(){
 }
 function setPaused(value){
  if(!running)return;
+ if(localMode==='guest'){
+  LocalWifi.send({t:'pause',paused:Boolean(value)});return;
+ }
  paused=Boolean(value);
  if(paused){clearInput();heldJumpPointers.clear();saveMatch()}
  $('status').textContent=paused?'Paused':'Playing';
@@ -892,8 +901,15 @@ function begin(){
  $('status').textContent='Playing';
  updateTimers();
 }
-function restart(){if(applyPendingUpdate())return;begin()}
+function restart(){
+ if(applyPendingUpdate())return;
+ if(localMode==='guest'){LocalWifi.send({t:'restart'});return}
+ begin();
+ if(localMode==='host')LocalWifi.send({t:'restart-start'});
+}
 function finish(){
+ if(localMode==='host')
+  LocalWifi.send({t:'end',red:red.score,blue:blue.score,matchMs});
  playRefereeWhistle('end');
  recordMatchTime('completed');
  running=false;paused=false;clearInput();clearSavedMatch();
@@ -907,8 +923,9 @@ function finish(){
  matchMs=0;pointMs=0;updateTimers();
 }
 function score(side){
- learnFromRally(side);
+ if(localMode==='ai')learnFromRally(side);
  if(side==='red')red.score++;else blue.score++;
+ if(localMode==='host')LocalWifi.send({t:'point',side,red:red.score,blue:blue.score,pointMs,matchMs});
  playPointEndSound(side);
  recordPointTime(side);
  if(red.score>=15||blue.score>=15){finish();return}
@@ -1035,6 +1052,15 @@ function advanceBall(body,dt=1){
 function tick(dt){
  frame+=dt;rallyTicks+=dt;touchLock=Math.max(0,touchLock-dt);
  move(red,slideTargetX===null?0:Math.sign(slideTargetX-red.x),pressed.jump,dt);
+ if(localMode==='host'){
+  // One authoritative physics simulation: remote player controls Blue.
+  // Both humans move with the same legal speed and impact-angle physics.
+  blue.cpuSpeed=6.6;
+  const min=netX+netHalf+blue.r,max=W-blue.r;
+  const desired=min+clamp(remoteInput.x,0,1)*(max-min);
+  const direction=Math.abs(desired-blue.x)<5?0:Math.sign(desired-blue.x);
+  move(blue,direction,remoteInput.jump,dt);
+ }else{
  const difficulty=$('difficulty').value;
  const cpuProfiles={
   easy:  {speed:4.2,reaction:16,error:29,tolerance:20,horizon:48,serveDelay:46,jumpCooldown:51},
@@ -1188,6 +1214,7 @@ function tick(dt){
  const tolerance=profile.tolerance;
  dir=aim>blue.x+tolerance?1:aim<blue.x-tolerance?-1:0;
  move(blue,dir,jump,dt);
+ }
  if(awaitServe){collide(server==='red'?red:blue);return}
  // The open sky has no ceiling. Swept substeps prevent passing through the net.
  advanceBall(ball,dt);
@@ -1382,7 +1409,12 @@ function draw(){
  }
  ctx.textAlign='center';ctx.font='bold 19px system-ui';ctx.lineWidth=3;
  ctx.strokeStyle='#1d3545bb';ctx.fillStyle='#fff';
- ctx.strokeText('OPPONENT',W*.89,82);ctx.fillText('OPPONENT',W*.89,82);
+ const otherLabel=localMode==='ai'?'OPPONENT':peerName.toUpperCase().slice(0,18);
+ if(localMode==='guest'){
+  ctx.strokeText(otherLabel,W*.11,82);ctx.fillText(otherLabel,W*.11,82);
+ }else{
+  ctx.strokeText(otherLabel,W*.89,82);ctx.fillText(otherLabel,W*.89,82);
+ }
  ctx.font='bold 32px system-ui';ctx.strokeText(red.score+' : '+blue.score,netX,47);ctx.fillText(red.score+' : '+blue.score,netX,47);
 }
 // iOS Home Screen PWAs sometimes report 100dvh shorter than the actual
@@ -1402,8 +1434,9 @@ function syncGameViewport(){
  const standalone=Boolean(navigator.standalone)||
    Boolean(window.matchMedia?.('(display-mode: standalone)').matches);
  const useScreen=isIOS&&standalone&&screenShort>0&&screenLong>0;
- const portrait=viewportH>viewportW&&
-   isIOS&&Math.min(viewportW,viewportH)<700;
+ // Support Android/other touch phones as well as iPhones.
+ const isPhone=(navigator.maxTouchPoints||0)>0&&Math.min(viewportW,viewportH)<700;
+ const portrait=viewportH>viewportW&&isPhone;
  const shortSide=useScreen?Math.max(viewportW,screenShort):viewportW;
  const longSide=useScreen?Math.max(viewportH,screenLong):viewportH;
  const width=portrait?shortSide:(useScreen?Math.max(viewportW,screenLong):viewportW);
@@ -1459,12 +1492,18 @@ function loop(now){
  const rawDelta=last?Math.max(0,Math.min(100,now-last)):0;
  let dt=Math.min(1.8,rawDelta/16.67||1);
  last=now;
- if(running&&!paused){
+ if(running&&!paused&&localMode!=='guest'){
   if(matchStarted)matchMs+=rawDelta;
   if(!awaitServe)pointMs+=rawDelta;
   tick(dt);
   updateTimers();
   if(matchMs-lastSnapshotMs>=5000){saveMatch();lastSnapshotMs=matchMs}
+ }
+ if(localMode==='host'&&LocalWifi.connected&&now-lastRemoteFrame>=50){
+  sendLocalSnapshot();lastRemoteFrame=now;
+ }
+ if(localMode==='guest'&&LocalWifi.connected&&now-lastInputFrame>=34){
+  sendLocalInput();lastInputFrame=now;
  }
  draw();
  requestAnimationFrame(loop);
