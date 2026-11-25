@@ -450,6 +450,13 @@ body.fullscreen #stage .hud .left-hud,body.fullscreen #stage .hud .buttons{max-w
  .wifi-dialog .wifi-qr,.wifi-dialog .wifi-code-actions{grid-column:1;grid-row:auto}
  .wifi-dialog .wifi-qr svg{width:min(100%,40dvh,330px)}
 }
+/* Android immersive mode: let the game use the viewport newly exposed
+   when Chrome or an installed PWA hides the phone's system chrome. */
+html:fullscreen,html:-webkit-full-screen,
+html:fullscreen body,html:-webkit-full-screen body{
+ width:100%;height:100%;margin:0;overflow:hidden;
+}
+.settings-dialog #androidFullscreen[hidden]{display:none!important}
 </style></head><body class="fullscreen"><main>
 <div id="stage" class="stage"><canvas id="game" width="800" height="500" aria-label="Red and blue blobs playing volleyball on a beach"></canvas>
 <div class="hud">
@@ -509,10 +516,12 @@ body.fullscreen #stage .hud .left-hud,body.fullscreen #stage .hud .buttons{max-w
  </section>
 </div>
 <div id="settingsPanel" class="settings-panel" role="dialog" aria-modal="true" aria-label="Game settings" hidden><div class="settings-dialog">
-<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.8.3</small></p>
+<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.8.4</small></p>
 <label class="settings-field">Difficulty<select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><p class="difficulty-note" id="difficultyDescription">Normal • balanced speed, timing and aim</p>
 <button id="sound" class="settings-action" type="button">🔊 Sound on</button>
-<button id="resetLearning" class="settings-action" type="button">🧠 Reset Blue AI</button><button id="wifiSettingsButton" class="settings-action" type="button">📶 Local Wi-Fi Multiplayer</button>
+<button id="resetLearning" class="settings-action" type="button">🧠 Reset Blue AI</button>
+<button id="androidFullscreen" class="settings-action" type="button" hidden>⛶ Enter full screen</button>
+<button id="wifiSettingsButton" class="settings-action" type="button">📶 Local Wi-Fi Multiplayer</button>
 <p class="developer">Developed by: Engr. Rico J. Pono</p>
 <button id="closeSettings" class="settings-close" type="button">Close</button>
 </div></div>
@@ -1520,6 +1529,53 @@ function requestLandscapeOrientation(){
   }
  }catch{}
 }
+// Android Chrome cannot hide the OS status/navigation bars merely with
+// CSS. Installed PWAs launch fullscreen through the manifest; browser tabs
+// require an explicit user gesture for the Fullscreen API.
+function isAndroidDevice(){return /Android/i.test(navigator.userAgent||'')}
+function isImmersiveGameDisplay(){
+ return Boolean(document.fullscreenElement||document.webkitFullscreenElement)||
+   Boolean(window.matchMedia?.('(display-mode: fullscreen)').matches);
+}
+function refreshAndroidFullscreenButton(){
+ const button=$('androidFullscreen');
+ if(button)button.hidden=!isAndroidDevice()||isImmersiveGameDisplay();
+}
+function requestImmersiveGameFullscreen(){
+ if(!isAndroidDevice()){
+  requestLandscapeOrientation();return;
+ }
+ if(isImmersiveGameDisplay()){
+  requestLandscapeOrientation();
+  refreshAndroidFullscreenButton();
+  return;
+ }
+ // Fullscreen the entire document (NOT just the canvas). Settings,
+ // pairing camera, history, and player-name dialogs live outside #stage.
+ const root=document.documentElement;
+ const enter=root?.requestFullscreen||root?.webkitRequestFullscreen;
+ if(typeof enter!=='function'){refreshAndroidFullscreenButton();return}
+ const onEnter=()=>{
+  requestLandscapeOrientation(); // Orientation lock is often allowed only when fullscreen.
+  lastLayoutSignature='';
+  resizeCourt();
+  refreshAndroidFullscreenButton();
+ };
+ try{
+  const task=enter.call(root,{navigationUI:'hide'});
+  if(task&&typeof task.then==='function')
+   task.then(onEnter).catch(()=>refreshAndroidFullscreenButton());
+  else onEnter();
+ }catch{
+  // Older Android browsers may not support the navigationUI option.
+  try{
+   const task=enter.call(root);
+   if(task&&typeof task.then==='function')
+    task.then(onEnter).catch(()=>refreshAndroidFullscreenButton());
+   else onEnter();
+  }catch{refreshAndroidFullscreenButton()}
+ }
+}
 function resizeCourt(){
  syncGameViewport();
  // offsetWidth/Height are the UNROTATED court dimensions. Bounding rect
@@ -1533,6 +1589,12 @@ function resizeCourt(){
  W=newW;netX=W/2;canvas.width=Math.round(W);canvas.height=H;renderBackdrop();
 }
 window.addEventListener('resize',resizeCourt);
+document.addEventListener('fullscreenchange',()=>{
+ lastLayoutSignature='';resizeCourt();refreshAndroidFullscreenButton();
+});
+document.addEventListener('webkitfullscreenchange',()=>{
+ lastLayoutSignature='';resizeCourt();refreshAndroidFullscreenButton();
+});
 window.addEventListener('orientationchange',()=>{
  lastLayoutSignature='';resizeCourt();
  setTimeout(()=>{lastLayoutSignature='';resizeCourt()},200);
@@ -1621,8 +1683,10 @@ window.addEventListener('blur',pauseOnExit);
 window.addEventListener('pagehide',pauseOnExit);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)pauseOnExit()});
 $('start').onclick=()=>{
+ // Must request fullscreen synchronously inside this real button click.
+ requestImmersiveGameFullscreen();
  if(LocalWifi.active){LocalWifi.leave();localMode='ai';updatePeerLabel()}
- wakeAudio();requestLandscapeOrientation();begin();
+ wakeAudio();begin();
 };
 // iOS can delay or lose the synthesized click over a touch-action:none
 // game court. Handle a finger's pointerup immediately and suppress its
@@ -1662,8 +1726,11 @@ $('playerNamePanel').addEventListener('pointerdown',event=>{
 document.addEventListener('keydown',event=>{
  if(event.key==='Escape'&&!$('playerNamePanel').hidden)closePlayerNameEditor();
 });
-bindHudButton('restart',restart);
-bindHudButton('pauseBtn',()=>{wakeAudio();setPaused(!paused)});
+bindHudButton('restart',()=>{requestImmersiveGameFullscreen();restart()});
+bindHudButton('pauseBtn',()=>{
+ if(paused)requestImmersiveGameFullscreen();
+ wakeAudio();setPaused(!paused);
+});
 bindHudButton('settingsButton',()=>{
  setPaused(true);
  $('settingsPanel').hidden=false;
@@ -1676,6 +1743,7 @@ function closeSettings(){
  $('settingsButton').focus();
 }
 $('closeSettings').onclick=closeSettings;
+$('androidFullscreen').onclick=requestImmersiveGameFullscreen;
 $('settingsPanel').addEventListener('pointerdown',e=>{if(e.target===$('settingsPanel'))closeSettings()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('settingsPanel').hidden)closeSettings()});
 const updateDifficultyDescription=()=>{
@@ -1840,8 +1908,11 @@ LocalWifi.attach({
   }
  }
 });
-$('wifiModeButton').onclick=()=>{wakeAudio();LocalWifi.openPairing()};
+$('wifiModeButton').onclick=()=>{
+ requestImmersiveGameFullscreen();wakeAudio();LocalWifi.openPairing();
+};
 $('wifiSettingsButton').onclick=()=>{
+ requestImmersiveGameFullscreen();
  wakeAudio();
  if(running&&localMode==='ai')setPaused(true);
  $('settingsPanel').hidden=true;
@@ -1850,7 +1921,11 @@ $('wifiSettingsButton').onclick=()=>{
 
 document.body.classList.add('fullscreen');
 syncGameViewport();
+// Installed Android PWAs use manifest.display=fullscreen on launch;
+// a browser tab cannot enter it without the player's tap.
 requestLandscapeOrientation();
+refreshAndroidFullscreenButton();
+$('wifiStart').addEventListener('click',requestImmersiveGameFullscreen,{capture:true});
 updateTimers();
 // Updates are checked on launch, resume and periodically, but never interrupt a match.
 const APP_VERSION='1.8.0';
