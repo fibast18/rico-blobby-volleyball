@@ -7,6 +7,15 @@ const page=fs.readFileSync('index.html','utf8');
 const ids=['restart','pauseBtn','settingsButton','matchTimer','pointTimer'];
 for(const id of ids)assert(page.includes("bindHudButton('"+id+"'"),
  'The '+id+' control must use immediate touch activation');
+const transparentHud=page.slice(page.indexOf('/* v2.7.2: transparent HUD;'));
+assert(transparentHud.includes('background:transparent!important;'),
+ 'Top controls must not display distracting opaque rectangles');
+assert(transparentHud.includes('border:0!important;'),
+ 'Top controls must have no surrounding boxes or borders');
+assert(transparentHud.includes('text-shadow:'),
+ 'Transparent labels must remain readable against the bright sky');
+assert(transparentHud.includes('button:is(:active,.tapping)'),
+ 'Tap feedback must remain lightweight without a colored rectangle');
 assert(page.includes('min-height:48px!important;'),'Landscape top buttons need 48px touch targets');
 assert(page.includes('min-height:44px!important;'),'Compact screens need at least 44px touch targets');
 assert(page.includes('pointer-events:auto!important;'),'HUD buttons must receive pointer events');
