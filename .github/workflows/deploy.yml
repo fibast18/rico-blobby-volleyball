@@ -48,6 +48,7 @@ jobs:
           node tests/iphone-landscape-viewport-regression.cjs
           node tests/local-wifi-protocol-regression.cjs
           node tests/local-human-game-regression.cjs
+          node tests/local-guest-perspective-regression.cjs
           node tests/iphone-top-controls-regression.cjs
           node tests/player-name-regression.cjs
           node tests/timer-history-regression.cjs
