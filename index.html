@@ -313,18 +313,78 @@ body.fullscreen #stage .hud button:is(:active,.tapping){
   border-color:transparent!important;
   opacity:.72;
 }
+
+/* v2.7.3: tappable player identity replaces the painted canvas label. */
+#playerNameButton{
+ position:absolute;z-index:20;left:11%;top:15.1%;
+ transform:translate(-50%,-50%);
+ min-height:44px;min-width:85px;max-width:23%;
+ padding:0 7px;
+ background:transparent;border:0;box-shadow:none;
+ color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+ font:700 clamp(14px,1.9vw,20px)/1.2 system-ui;
+ text-shadow:0 1px 3px #163346,0 0 4px #102a40;
+ text-transform:uppercase;
+ touch-action:manipulation;-webkit-tap-highlight-color:transparent;
+ cursor:pointer;
+}
+#playerNameButton:active,#playerNameButton.tapping{opacity:.7}
+#playerNameButton:focus-visible{outline:2px solid #ffcf58;outline-offset:-2px;border-radius:8px}
+.player-name-panel[hidden]{display:none!important}
+.player-name-panel{
+ position:fixed;inset:0;z-index:1002;display:grid;place-items:center;
+ padding:max(12px,env(safe-area-inset-top,0px)) max(14px,env(safe-area-inset-right,0px))
+ max(14px,env(safe-area-inset-bottom,0px)) max(14px,env(safe-area-inset-left,0px));
+ background:#002743bd;backdrop-filter:blur(4px);touch-action:auto!important;
+}
+.player-name-dialog{
+ display:flex;flex-direction:column;gap:12px;width:min(360px,96%);
+ max-height:94%;overflow-y:auto;padding:20px;border-radius:16px;
+ border:1px solid #ffffff50;background:#073b62f5;
+ box-shadow:0 12px 40px #00213691;
+}
+.player-name-dialog h2{margin:0;font-size:20px;text-align:center}
+.player-name-dialog label{font-size:13px;font-weight:650}
+.player-name-dialog input{
+ width:100%;border:1px solid #d3e7ff;border-radius:10px;
+ min-height:46px;padding:10px 12px;background:#fff;color:#14364f;
+ font:500 16px system-ui;
+}
+.player-name-actions{display:flex;gap:10px}
+.player-name-actions button{
+ flex:1;min-height:46px;border:0;border-radius:10px;
+ padding:10px;font:700 15px system-ui;background:#eef3fa;color:#16334e;
+ touch-action:manipulation;
+}
+#playerNameSave{background:#ffc94a;color:#19374c}
+@media(orientation:landscape) and (max-height:460px){
+ .player-name-dialog{gap:7px;padding:12px 16px}
+ .player-name-dialog h2{font-size:17px}
+}
 </style></head><body class="fullscreen"><main>
 <div id="stage" class="stage"><canvas id="game" width="800" height="500" aria-label="Red and blue blobs playing volleyball on a beach"></canvas>
 <div class="hud">
   <div class="left-hud"><span id="status" class="mini" aria-live="polite">Ready</span><button class="clock" id="matchTimer" type="button" aria-label="View match timer history" aria-haspopup="dialog">Match 00:00</button><button class="clock" id="pointTimer" type="button" aria-label="View point timer history" aria-haspopup="dialog">Point 00:00</button></div>
   <div class="buttons"><button id="restart" class="mini" type="button">↻ Restart</button><button id="pauseBtn" class="mini" type="button">⏸ Pause</button><button id="settingsButton" class="mini settings-gear" type="button" aria-label="Settings" aria-haspopup="dialog" aria-expanded="false">⚙</button></div>
 </div>
+<button id="playerNameButton" type="button" class="player-name-button" aria-label="Change your player name" aria-haspopup="dialog">PLAYER</button>
 <div id="message" class="message" hidden aria-live="polite"></div>
 <div class="controls" id="controls"><div class="control" id="movementPad" data-control="slide" role="slider" aria-label="Slide your finger left or right to move Red Blobby" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" tabindex="0"><span class="slide-track"><span class="slide-thumb" id="slideThumb"></span></span></div><button class="control" type="button" data-control="jump" aria-label="Jump anywhere on the right half of the court"></button></div>
 <div id="overlay" class="overlay"><div class="dialog"><h2 id="title">Ready to play?</h2><p id="detail">First to 15 points.</p><button id="start" type="button">▶ Play</button></div></div>
 </div>
+<div id="playerNamePanel" class="player-name-panel" role="dialog" aria-modal="true" aria-labelledby="playerNameTitle" hidden>
+ <form id="playerNameForm" class="player-name-dialog">
+  <h2 id="playerNameTitle">What should I call you?</h2>
+  <label for="playerNameInput">Player name</label>
+  <input id="playerNameInput" type="text" maxlength="18" autocomplete="nickname" autocapitalize="words" enterkeyhint="done" placeholder="Enter your name">
+  <div class="player-name-actions">
+   <button id="playerNameCancel" type="button">Cancel</button>
+   <button id="playerNameSave" type="submit">Save</button>
+  </div>
+ </form>
+</div>
 <div id="settingsPanel" class="settings-panel" role="dialog" aria-modal="true" aria-label="Game settings" hidden><div class="settings-dialog">
-<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.7.2</small></p>
+<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.7.3</small></p>
 <label class="settings-field">Difficulty<select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><p class="difficulty-note" id="difficultyDescription">Normal • balanced speed, timing and aim</p>
 <button id="sound" class="settings-action" type="button">🔊 Sound on</button>
 <button id="resetLearning" class="settings-action" type="button">🧠 Reset Blue AI</button>
@@ -353,6 +413,37 @@ let running=false,paused=false,matchStarted=false,matchMs=0,pointMs=0,awaitServe
 const pressed={jump:false};
 let slidePointerId=null,slideTargetX=null;
 let lastVolleySide=null,consecutiveTouches=0,touchFault=null;
+// Per-device player label. Keep saved names out of HTML so user input is
+// always rendered as plain text, never interpreted as markup.
+const PLAYER_NAME_KEY='rico-blobby-player-name-v1';
+function normalizePlayerName(value){
+ return String(value||'').trim().replace(/\s+/g,' ').slice(0,18)||'PLAYER';
+}
+function loadPlayerName(){
+ try{return normalizePlayerName(localStorage.getItem(PLAYER_NAME_KEY))}catch{return 'PLAYER'}
+}
+let playerName=loadPlayerName(),playerNameWasPlaying=false;
+function savePlayerName(value){
+ playerName=normalizePlayerName(value);
+ try{localStorage.setItem(PLAYER_NAME_KEY,playerName)}catch{}
+ $('playerNameButton').textContent=playerName;
+}
+function openPlayerNameEditor(){
+ if(!$('playerNamePanel').hidden)return;
+ playerNameWasPlaying=running&&!paused;
+ if(running)setPaused(true);
+ $('playerNameInput').value=playerName==='PLAYER'?'':playerName;
+ $('playerNamePanel').hidden=false;
+ $('playerNameInput').focus();
+}
+function closePlayerNameEditor(){
+ if($('playerNamePanel').hidden)return;
+ $('playerNamePanel').hidden=true;
+ if(playerNameWasPlaying&&running&&!document.hidden)setPaused(false);
+ playerNameWasPlaying=false;
+ $('playerNameButton').focus();
+}
+
 function updateMovementTarget(clientX,clientY){
  const rect=stage.getBoundingClientRect();
  // In portrait the court is visually rotated 90 degrees. Finger movement
@@ -1207,7 +1298,6 @@ function draw(){
  }
  ctx.textAlign='center';ctx.font='bold 19px system-ui';ctx.lineWidth=3;
  ctx.strokeStyle='#1d3545bb';ctx.fillStyle='#fff';
- ctx.strokeText('PLAYER',W*.11,82);ctx.fillText('PLAYER',W*.11,82);
  ctx.strokeText('OPPONENT',W*.89,82);ctx.fillText('OPPONENT',W*.89,82);
  ctx.font='bold 32px system-ui';ctx.strokeText(red.score+' : '+blue.score,netX,47);ctx.fillText(red.score+' : '+blue.score,netX,47);
 }
@@ -1374,6 +1464,20 @@ function bindHudButton(id,handler){
   if(!button.disabled)handler();
  });
 }
+$('playerNameButton').textContent=playerName;
+bindHudButton('playerNameButton',openPlayerNameEditor);
+$('playerNameForm').addEventListener('submit',event=>{
+ event.preventDefault();
+ savePlayerName($('playerNameInput').value);
+ closePlayerNameEditor();
+});
+$('playerNameCancel').onclick=closePlayerNameEditor;
+$('playerNamePanel').addEventListener('pointerdown',event=>{
+ if(event.target===$('playerNamePanel'))closePlayerNameEditor();
+});
+document.addEventListener('keydown',event=>{
+ if(event.key==='Escape'&&!$('playerNamePanel').hidden)closePlayerNameEditor();
+});
 bindHudButton('restart',restart);
 bindHudButton('pauseBtn',()=>{wakeAudio();setPaused(!paused)});
 bindHudButton('settingsButton',()=>{
