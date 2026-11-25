@@ -112,7 +112,8 @@ jobs:
           for attempt in $(seq 1 15); do
             count=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts" --jq '[.artifacts[]? | select(.name == "github-pages")] | length' 2>/dev/null || echo 0)
             if [ "$count" != "0" ]; then
-              echo "GitHub Pages artifact is ready."
+              echo "GitHub Pages artifact is visible; allowing Pages deployment metadata to propagate."
+              sleep 25
               exit 0
             fi
             echo "Waiting for Pages artifact metadata ($attempt/15)..."
