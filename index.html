@@ -1002,7 +1002,9 @@ function collide(p){
  ball.vy=Math.max(-15,Math.min(9,vy));
  if(awaitServe)matchStarted=true; // First actual serve contact, not Play button.
  awaitServe=false;rallyTicks=0;
- playTone(390);$('message').textContent='';
+ playTone(390);
+ if(localMode==='host')LocalWifi.send({t:'hit'});
+ $('message').textContent='';
  return true;
 }
 // Ball-versus-post collision: closest-point normal on a rounded corner.
@@ -1673,6 +1675,7 @@ function updatePeerLabel(){
    'Slide your finger to move Red Blobby');
 }
 function beginGuestMatch(){
+ playRefereeWhistle('start');
  if(running)recordMatchTime('restarted');
  clearSavedMatch();newMatchIdentity();
  red.score=0;blue.score=0;
@@ -1729,6 +1732,7 @@ function localWifiMessage(data){
   }
  }else if(localMode==='guest'){
   if(data.t==='start'||data.t==='restart-start')beginGuestMatch();
+  else if(data.t==='hit')playTone(390);
   else if(data.t==='state')receiveLocalState(data);
   else if(data.t==='point'){
    // Point data arrive BEFORE the authoritative host resets its timer.
@@ -1775,8 +1779,9 @@ LocalWifi.attach({
   }
  }
 });
-$('wifiModeButton').onclick=()=>LocalWifi.openPairing();
+$('wifiModeButton').onclick=()=>{wakeAudio();LocalWifi.openPairing()};
 $('wifiSettingsButton').onclick=()=>{
+ wakeAudio();
  if(running&&localMode==='ai')setPaused(true);
  $('settingsPanel').hidden=true;
  LocalWifi.openPairing();
