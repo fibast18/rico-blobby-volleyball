@@ -13,7 +13,7 @@ function scenario({x,y,vx,vy,blueX=605,frames=25,learned=0}){
  const blue={x:blueX,y:430,vx:0,vy:0,r:49.45,hitCooldown:0,jelly:0,jellyV:0,movePhase:0,score:0};
  const ball={x,y,vx,vy,r:36};
  const ctx={
-  W:800,netX:400,ground:430,netTop:262,netHalf:7,
+  W:800,netX:400,ground:430,netTop:262,netHalf:7,localMode:'ai',
   red,blue,ball,frame:0,rallyTicks:0,touchLock:0,slideTargetX:null,
   pressed:{jump:false},awaitServe:false,server:'red',serveDelay:0,
   cpuJumpCooldown:0,cpuJumpArmed:true,cpuJumpPlan:null,
