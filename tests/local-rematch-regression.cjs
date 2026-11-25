@@ -12,6 +12,10 @@ const section=(a,b)=>{
 const modal=html.slice(html.indexOf('<div id="overlay"'),html.indexOf('<div id="playerNamePanel"'));
 assert(modal.includes('id="wifiRematch"')&&modal.includes('hidden'),
  'Replay button must exist on the game-over panel, initially hidden');
+assert(modal.indexOf('id="wifiRematch"')<modal.indexOf('id="start"'),
+ 'Play Again must appear before Leave Wi-Fi so players do not disconnect by mistake');
+assert(html.includes("Leave Wi-Fi • Play vs AI"),
+ 'Leaving the Wi-Fi session for single-player must be clearly labeled');
 assert(html.includes("id='not real'")===false);
 assert(html.includes("if(localMode==='ai'&&applyPendingUpdate())return"),
  'Local rematch must never reload the app and discard the Wi-Fi connection');
