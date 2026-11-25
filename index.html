@@ -226,6 +226,74 @@ body.fullscreen #stage canvas{
   width:100%!important;
   height:100%!important;
 }
+
+/* v2.7.1: iPhone HUD tap targets stay clear of screen edges and
+   take priority over the transparent half-court movement/jump zones. */
+body.fullscreen #stage .hud{
+  z-index:30!important;
+  pointer-events:none!important;
+  top:max(13px,calc(env(safe-area-inset-top,0px) + 7px))!important;
+  left:max(14px,calc(env(safe-area-inset-left,0px) + 8px))!important;
+  right:max(14px,calc(env(safe-area-inset-right,0px) + 8px))!important;
+  align-items:flex-start!important;
+  gap:8px!important;
+}
+body.fullscreen #stage .hud .left-hud,
+body.fullscreen #stage .hud .buttons{
+  display:flex!important;
+  flex-direction:row!important;
+  flex-wrap:nowrap!important;
+  align-items:center!important;
+  gap:7px!important;
+  min-width:0;
+  pointer-events:none!important;
+}
+body.fullscreen #stage .hud button.mini,
+body.fullscreen #stage .hud button.clock{
+  position:relative;
+  z-index:31!important;
+  pointer-events:auto!important;
+  touch-action:manipulation!important;
+  -webkit-tap-highlight-color:transparent!important;
+  min-height:48px!important;
+  min-width:48px!important;
+  padding:0 11px!important;
+  border-radius:12px!important;
+  font:650 clamp(12px,1.8vw,17px)/1.15 system-ui!important;
+  white-space:nowrap;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  cursor:pointer;
+}
+body.fullscreen #stage .hud button.clock{
+  font-variant-numeric:tabular-nums!important;
+}
+body.fullscreen #stage .hud .settings-gear{
+  width:48px!important;
+  padding:0!important;
+  font-size:25px!important;
+}
+body.fullscreen #stage .hud button:is(:active,.tapping){
+  background:#2a73a5eb!important;
+  border-color:#ffffff9c!important;
+}
+body.fullscreen.portrait-landscape #stage .hud .left-hud,
+body.fullscreen.portrait-landscape #stage .hud .buttons{
+  max-width:none!important;
+}
+@media(max-width:690px){
+ body.fullscreen #stage .hud{gap:4px!important;left:9px!important;right:9px!important}
+ body.fullscreen #stage .hud .left-hud,body.fullscreen #stage .hud .buttons{gap:4px!important}
+ body.fullscreen #stage .hud button.mini,
+ body.fullscreen #stage .hud button.clock{
+   min-height:44px!important;
+   min-width:44px!important;
+   padding:0 7px!important;
+   font-size:12px!important;
+ }
+ body.fullscreen #stage .hud .settings-gear{width:44px!important}
+}
 </style></head><body class="fullscreen"><main>
 <div id="stage" class="stage"><canvas id="game" width="800" height="500" aria-label="Red and blue blobs playing volleyball on a beach"></canvas>
 <div class="hud">
@@ -237,7 +305,7 @@ body.fullscreen #stage canvas{
 <div id="overlay" class="overlay"><div class="dialog"><h2 id="title">Ready to play?</h2><p id="detail">First to 15 points.</p><button id="start" type="button">▶ Play</button></div></div>
 </div>
 <div id="settingsPanel" class="settings-panel" role="dialog" aria-modal="true" aria-label="Game settings" hidden><div class="settings-dialog">
-<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.7.0</small></p>
+<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.7.1</small></p>
 <label class="settings-field">Difficulty<select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><p class="difficulty-note" id="difficultyDescription">Normal • balanced speed, timing and aim</p>
 <button id="sound" class="settings-action" type="button">🔊 Sound on</button>
 <button id="resetLearning" class="settings-action" type="button">🧠 Reset Blue AI</button>
@@ -1263,14 +1331,38 @@ window.addEventListener('blur',pauseOnExit);
 window.addEventListener('pagehide',pauseOnExit);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)pauseOnExit()});
 $('start').onclick=()=>{wakeAudio();requestLandscapeOrientation();begin()};
-$('restart').onclick=restart;
-$('pauseBtn').onclick=()=>{wakeAudio();setPaused(!paused)};
-$('settingsButton').onclick=()=>{
+// iOS can delay or lose the synthesized click over a touch-action:none
+// game court. Handle a finger's pointerup immediately and suppress its
+// subsequent synthetic click, while retaining keyboard/mouse activation.
+function bindHudButton(id,handler){
+ const button=$(id);
+ let lastTouchUp=0;
+ button.addEventListener('pointerdown',event=>{
+  if(event.pointerType==='touch'||event.pointerType==='pen')
+   button.classList.add('tapping');
+ },{passive:true});
+ button.addEventListener('pointerup',event=>{
+  button.classList.remove('tapping');
+  if(event.pointerType!=='touch'&&event.pointerType!=='pen')return;
+  if(button.disabled)return;
+  lastTouchUp=Date.now();
+  event.preventDefault();
+  handler();
+ },{passive:false});
+ button.addEventListener('pointercancel',()=>button.classList.remove('tapping'));
+ button.addEventListener('click',event=>{
+  if(Date.now()-lastTouchUp<600){event.preventDefault();return}
+  if(!button.disabled)handler();
+ });
+}
+bindHudButton('restart',restart);
+bindHudButton('pauseBtn',()=>{wakeAudio();setPaused(!paused)});
+bindHudButton('settingsButton',()=>{
  setPaused(true);
  $('settingsPanel').hidden=false;
  $('settingsButton').setAttribute('aria-expanded','true');
  $('closeSettings').focus();
-};
+});
 function closeSettings(){
  $('settingsPanel').hidden=true;
  $('settingsButton').setAttribute('aria-expanded','false');
@@ -1295,8 +1387,8 @@ $('resetLearning').onclick=()=>{
  $('resetLearning').textContent='✓ Blue AI reset';
 };
 updateLearningLabel();
-$('matchTimer').onclick=()=>openTimeHistory('matches');
-$('pointTimer').onclick=()=>openTimeHistory('points');
+bindHudButton('matchTimer',()=>openTimeHistory('matches'));
+bindHudButton('pointTimer',()=>openTimeHistory('points'));
 $('historyMatches').onclick=()=>showTimeHistory('matches');
 $('historyPoints').onclick=()=>showTimeHistory('points');
 $('historyClose').onclick=closeTimeHistory;
