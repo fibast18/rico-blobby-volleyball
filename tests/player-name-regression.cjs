@@ -17,8 +17,8 @@ assert(page.includes('background:transparent;border:0;box-shadow:none;'),
  'Player label must have no distracting box');
 assert(!page.includes("ctx.strokeText('PLAYER'"),
  'Old drawn PLAYER text must not be duplicated behind button');
-assert(page.includes("ctx.strokeText('OPPONENT'"),
- 'CPU opponent label must remain unchanged');
+assert(page.includes("localMode==='ai'?'OPPONENT':peerName"),
+ 'CPU opponent label must remain while LAN mode shows the human opponent');
 
 const begin=page.indexOf("const PLAYER_NAME_KEY='rico-blobby-player-name-v1';");
 const end=page.indexOf('function updateMovementTarget(clientX,clientY){',begin);
