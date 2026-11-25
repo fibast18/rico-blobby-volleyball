@@ -1,4 +1,4 @@
-const PREFIX='rico-blobby-volleyball-';const CACHE=PREFIX+'v2.7.3';const ASSETS=['./','./index.html','./manifest.webmanifest','./icon.svg','./apple-touch-icon.png'];
+const PREFIX='rico-blobby-volleyball-';const CACHE=PREFIX+'v2.8.0';const ASSETS=['./','./index.html','./manifest.webmanifest','./icon.svg','./apple-touch-icon.png','./local-wifi.js','./vendor/qrcode.js','./vendor/qr-scanner.min.js','./vendor/qr-scanner-worker.min.js'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(Promise.all([caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith(PREFIX)&&k!==CACHE).map(k=>caches.delete(k)))),self.clients.claim()])));
 self.addEventListener('fetch',event=>{
