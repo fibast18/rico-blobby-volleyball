@@ -372,9 +372,9 @@ body.fullscreen #stage .hud button:is(:active,.tapping){
  background:rgba(0,24,43,.91);touch-action:auto!important;
  padding:max(7px,env(safe-area-inset-top,0px)) max(8px,env(safe-area-inset-right,0px))
  max(7px,env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));}
-.wifi-dialog{width:min(760px,100%);max-height:100%;overflow-y:auto;
+.wifi-dialog{width:min(880px,100%);max-height:100%;overflow-y:auto;
  background:#073956;border:1px solid #ffffff40;border-radius:15px;
- padding:12px 15px;display:grid;grid-template-columns:minmax(0,1fr) minmax(150px,220px);
+ padding:12px 15px;display:grid;grid-template-columns:minmax(0,1fr) clamp(185px,38vw,330px);
  column-gap:15px;row-gap:7px;align-items:center;}
 .wifi-heading{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:9px}
 .wifi-heading h2{font-size:clamp(15px,2.5vw,21px);margin:0}
@@ -391,14 +391,36 @@ body.fullscreen #stage .hud button:is(:active,.tapping){
 .wifi-qr{grid-column:2;grid-row:3/span 4;display:grid;place-items:center;align-self:center;
  min-height:90px;min-width:0}
 .wifi-qr:empty{display:none}
-.wifi-qr svg{width:min(100%,215px);height:auto;max-height:50dvh;border:5px solid white;
- background:#fff;border-radius:6px;display:block}
-.wifi-code-actions{grid-column:2;display:flex;gap:7px;justify-content:center;align-items:center;
- white-space:nowrap;font-size:12px}
+.wifi-qr svg{width:min(100%,68dvh,330px);height:auto;
+ background:white;border:8px solid white;border-radius:8px;display:block;
+ image-rendering:pixelated;shape-rendering:crispEdges}
+.wifi-code-actions{grid-column:2;display:flex;gap:5px;justify-content:center;
+ align-items:center;flex-wrap:wrap;white-space:nowrap;font-size:12px}
 .wifi-code-actions button{min-width:44px}
 .wifi-camera{grid-column:2;grid-row:3/span 4;position:relative}
-.wifi-camera video{max-width:100%;max-height:48dvh;border-radius:8px;background:#122a3d}
+.wifi-camera video{width:100%;max-height:60dvh;object-fit:contain;
+ border-radius:8px;background:#122a3d}
 .wifi-help{grid-column:1/-1;font-size:11px;margin:3px 0;color:#c5dded;line-height:1.4}
+.wifi-scan-feedback[hidden]{display:none!important}
+.wifi-scan-feedback{grid-column:1/-1;display:flex;gap:10px;align-items:center;
+ font-size:12px;color:#fff}
+.wifi-scan-feedback progress{flex:1;max-width:260px;height:13px;accent-color:#ffc94a}
+.wifi-dialog.scanning{grid-template-columns:1fr}
+.wifi-dialog.scanning .wifi-notice,.wifi-dialog.scanning .wifi-help,
+.wifi-dialog.scanning .wifi-text-fallback{display:none}
+.wifi-dialog.scanning .wifi-camera{grid-column:1;grid-row:auto;
+ justify-self:center;width:min(100%,520px)}
+.wifi-dialog.scanning #wifiStatus,.wifi-dialog.scanning .wifi-scan-feedback{grid-column:1}
+.wifi-dialog.presenting .wifi-notice,.wifi-dialog.presenting .wifi-help{display:none}
+.wifi-dialog.presenting #wifiStatus{min-height:25px}
+.wifi-qr{background:transparent}
+#wifiHold{min-width:72px}
+@media(orientation:portrait) and (max-width:650px){
+ .wifi-dialog{grid-template-columns:1fr}
+ .wifi-qr,.wifi-code-actions,.wifi-camera{grid-column:1;grid-row:auto}
+ .wifi-qr svg{width:min(100%,42dvh,330px)}
+ .wifi-dialog .wifi-code-actions{grid-column:1}
+}
 .wifi-text-fallback{grid-column:1/-1;font-size:12px}
 .wifi-text-fallback summary{cursor:pointer;padding:5px 0}
 .wifi-text-fallback label{display:block;margin:5px 0}
@@ -408,10 +430,15 @@ body.fullscreen #stage .hud button:is(:active,.tapping){
 body.fullscreen #stage .hud .left-hud,body.fullscreen #stage .hud .buttons{max-width:48%}
 #playerNameButton.blue-local{left:89%!important}
 @media(max-width:590px),(max-height:380px){
- .wifi-dialog{grid-template-columns:minmax(0,1fr) minmax(95px,32%);padding:8px;gap:5px}
+ .wifi-dialog{padding:8px;gap:5px}
+ .wifi-dialog:not(.scanning):not(.presenting){grid-template-columns:minmax(0,1fr) minmax(150px,38%)}
+ .wifi-dialog.presenting{grid-template-columns:minmax(0,1fr) clamp(160px,40vw,300px)}
+ .wifi-qr svg{width:min(100%,66dvh,300px)}
+ .wifi-dialog.scanning .wifi-camera{width:min(100%,450px)}
+ .wifi-dialog #wifiStatus{min-height:22px}
  .wifi-heading h2{font-size:15px}
  .wifi-dialog button{font-size:12px;padding:4px 8px;min-height:40px}
- .wifi-qr svg{max-height:46dvh}
+
  .wifi-notice,.wifi-help{font-size:10px}
  .wifi-step{padding:6px 8px;font-size:12px}
  #wifiStatus{font-size:11px}
@@ -442,16 +469,22 @@ body.fullscreen #stage .hud .left-hud,body.fullscreen #stage .hud .buttons{max-w
 </div>
 
 <div id="wifiPanel" class="wifi-panel" role="dialog" aria-modal="true" aria-label="Local Wi-Fi Multiplayer" hidden>
- <section class="wifi-dialog">
+ <section class="wifi-dialog" id="wifiDialog">
   <div class="wifi-heading"><h2>📶 Local Wi-Fi Multiplayer</h2><button id="wifiCancel" type="button" aria-label="Close Wi-Fi pairing">✕</button></div>
   <p class="wifi-notice">Two smartphones on the <strong>same Wi-Fi or phone hotspot</strong>. No mobile data, account, Bluetooth, cloud server or online opponent.</p>
   <div id="wifiStep" class="wifi-step" aria-live="polite">Step 1 of 3 — Choose Create or Join</div>
   <p id="wifiStatus" role="status" aria-live="polite">Choose Create or Join.</p>
+  <div id="wifiScanFeedback" class="wifi-scan-feedback" hidden>
+   <progress id="wifiScanProgress" max="1" value="0" aria-label="QR pages scanned"></progress>
+   <strong id="wifiScanCounter">Searching for the first QR page…</strong>
+  </div>
   <div id="wifiStartNew" class="wifi-actions"><button id="wifiCreate" type="button">1. Create (Red)</button><button id="wifiJoin" type="button">2. Join (Blue)</button></div>
   <div id="wifiQr" class="wifi-qr" aria-label="Pairing QR code"></div>
   <div id="wifiCodeActions" class="wifi-code-actions" hidden>
-   <button id="wifiPrev" type="button">◀</button><span id="wifiQrCount">QR 1 of 1</span>
-   <button id="wifiNext" type="button">▶</button>
+   <button id="wifiPrev" type="button" aria-label="Previous QR page">◀</button>
+   <span id="wifiQrCount">QR 1 of 1</span>
+   <button id="wifiNext" type="button" aria-label="Next QR page">▶</button>
+   <button id="wifiHold" type="button" aria-label="Hold QR page on screen">⏸ Hold</button>
   </div>
   <div id="wifiCamera" class="wifi-camera" hidden><video id="wifiVideo" playsinline muted autoplay></video></div>
   <div class="wifi-actions">
@@ -467,11 +500,11 @@ body.fullscreen #stage .hud .left-hud,body.fullscreen #stage .hud .buttons{max-w
    <textarea id="wifiPeerText" rows="2" spellcheck="false"></textarea>
    <button id="wifiImport" type="button">Import peer data</button>
   </details>
-  <p class="wifi-help"><strong>Two-way pairing:</strong> First, Player 2 scans Player 1's QR pages. Next, Player 1 scans the answer QR pages shown by Player 2. Only after both phones show Connected can either player tap Play Now to begin the same match. QR pages rotate automatically. Open the game online once on both phones to cache it for offline use.</p>
+  <p class="wifi-help"><strong>Two-way pairing:</strong> First, Player 2 scans Player 1's QR pages. Next, Player 1 scans the answer QR pages shown by Player 2. Only after both phones show Connected can either player tap Play Now to begin the same match. QR pages change every 8.5 seconds; tap Hold to keep a code still or use the arrows for manual pages. The scanning phone shows how many pages it has captured. Open the game online once on both phones to cache it for offline use.</p>
  </section>
 </div>
 <div id="settingsPanel" class="settings-panel" role="dialog" aria-modal="true" aria-label="Game settings" hidden><div class="settings-dialog">
-<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.8.1</small></p>
+<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.8.2</small></p>
 <label class="settings-field">Difficulty<select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><p class="difficulty-note" id="difficultyDescription">Normal • balanced speed, timing and aim</p>
 <button id="sound" class="settings-action" type="button">🔊 Sound on</button>
 <button id="resetLearning" class="settings-action" type="button">🧠 Reset Blue AI</button><button id="wifiSettingsButton" class="settings-action" type="button">📶 Local Wi-Fi Multiplayer</button>
