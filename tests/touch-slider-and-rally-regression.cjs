@@ -15,7 +15,7 @@ assert(html.includes('width:50%!important;height:100%!important'),'Slider must c
 assert(html.includes('left:50%!important;right:0!important;top:0!important;bottom:0!important;'),'Jump must cover right half');
 
 const sandbox={
- W:800,netX:400,netHalf:7,netTop:262,ground:430,
+ W:800,netX:400,netHalf:7,netTop:262,ground:430,localMode:'ai',
  red:{x:195,y:430,vx:0,vy:0,r:49.45,jelly:0,jellyV:0,movePhase:0,hitCooldown:0},
  blue:{x:605,y:430,vx:0,vy:0,r:49.45,jelly:0,jellyV:0,movePhase:0,hitCooldown:0},
  ball:{x:0,y:0,vx:0,vy:5,r:36},
