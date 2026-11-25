@@ -467,7 +467,7 @@ body.fullscreen #stage .hud .left-hud,body.fullscreen #stage .hud .buttons{max-w
    <textarea id="wifiPeerText" rows="2" spellcheck="false"></textarea>
    <button id="wifiImport" type="button">Import peer data</button>
   </details>
-  <p class="wifi-help"><strong>Two-way pairing:</strong> First, Player 2 scans Player 1's QR pages. Next, Player 1 scans the answer QR pages shown by Player 2. Only after both phones show Connected can Player 1 tap Play Now; Player 2 joins the match automatically. QR pages rotate automatically. Open the game online once on both phones to cache it for offline use.</p>
+  <p class="wifi-help"><strong>Two-way pairing:</strong> First, Player 2 scans Player 1's QR pages. Next, Player 1 scans the answer QR pages shown by Player 2. Only after both phones show Connected can either player tap Play Now to begin the same match. QR pages rotate automatically. Open the game online once on both phones to cache it for offline use.</p>
  </section>
 </div>
 <div id="settingsPanel" class="settings-panel" role="dialog" aria-modal="true" aria-label="Game settings" hidden><div class="settings-dialog">
@@ -1727,7 +1727,12 @@ function localWifiMessage(data){
   return;
  }
  if(localMode==='host'){
-  if(data.t==='input'){
+  if(data.t==='start-request'&&LocalWifi.connected&&!running){
+   LocalWifi.send({t:'start'});
+   begin();
+   $('wifiPanel').hidden=true;
+   sendLocalSnapshot();
+  }else if(data.t==='input'){
    if(data.x!==null&&Number.isFinite(Number(data.x)))
     remoteInput.x=clamp(Number(data.x),0,1);
    remoteInput.jump=!!data.jump;
