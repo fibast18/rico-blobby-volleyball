@@ -106,8 +106,11 @@ vm.runInContext('syncGameViewport()',ctx);
 assert(!classes.has('portrait-landscape'),'Rotating Android to landscape must remove visual transform');
 assert.equal(styles.get('--game-screen-w'),'873px');
 assert.equal(styles.get('--game-screen-h'),'393px');
+courtWidth=873;courtHeight=393;
+stage.getBoundingClientRect=()=>({left:0,top:0,width:873,height:393});
+vm.runInContext('resizeCourt()',ctx);
 ctx.localMode='guest';ctx.blue.r=49.45;
-vm.runInContext('updateMovementTarget(219,150)',ctx);
+vm.runInContext('updateMovementTarget(218.25,150)',ctx);
 const guestMin=ctx.netX+ctx.netHalf+ctx.blue.r;
 const guestMax=ctx.W-ctx.blue.r;
 assert(Math.abs(ctx.slideTargetX-(guestMin+(guestMax-guestMin)*.5))<.01,
