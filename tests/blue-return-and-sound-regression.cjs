@@ -9,7 +9,7 @@ assert(start>=0&&end>start,'Real collision and net physics not found');
 assert(!page.includes('chooseBlueReturn('),
  'Remove automatic target-directed Blue return: contact angle must matter');
 const ctx={
- W:800,netX:400,netHalf:7,netTop:262,ground:430,
+ W:800,netX:400,netHalf:7,netTop:262,ground:430,localMode:'ai',
  ball:{x:0,y:0,vx:0,vy:0,r:36},
  red:{x:195,y:430,vy:0,vx:0,r:49.45,hitCooldown:0,jellyV:0},
  blue:{x:600,y:430,vy:0,vx:0,r:49.45,hitCooldown:0,jellyV:0},
