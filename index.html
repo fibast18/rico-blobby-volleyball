@@ -200,6 +200,32 @@ button.clock:active{background:#1b6593}
 .history-panel{position:fixed!important;z-index:1001!important;touch-action:auto!important}
 .history-items{touch-action:pan-y!important}
 .difficulty-note{font-size:12px;opacity:.83;margin:-6px 0 2px;text-align:center}
+
+/* v2.7.0: correct intermittent iPhone standalone 100dvh under-sizing.
+   In an installed app the physical screen is sometimes taller than the
+   reported visual viewport after launching/rotating. JS sets the real size.
+   Portrait phones get a 90-degree landscape *render*, since iOS does
+   not offer a dependable browser API to rotate the physical display. */
+body.fullscreen #stage{
+  position:fixed!important;
+  inset:0 auto auto 0!important;
+  margin:0!important;
+  width:var(--game-screen-w,100vw)!important;
+  height:var(--game-screen-h,100dvh)!important;
+  max-height:none!important;
+  aspect-ratio:auto!important;
+  transform:none!important;
+  transform-origin:top left!important;
+}
+body.fullscreen.portrait-landscape #stage{
+  width:var(--game-portrait-long,100dvh)!important;
+  height:var(--game-portrait-short,100vw)!important;
+  transform:translateX(var(--game-portrait-short,100vw)) rotate(90deg)!important;
+}
+body.fullscreen #stage canvas{
+  width:100%!important;
+  height:100%!important;
+}
 </style></head><body class="fullscreen"><main>
 <div id="stage" class="stage"><canvas id="game" width="800" height="500" aria-label="Red and blue blobs playing volleyball on a beach"></canvas>
 <div class="hud">
@@ -211,7 +237,7 @@ button.clock:active{background:#1b6593}
 <div id="overlay" class="overlay"><div class="dialog"><h2 id="title">Ready to play?</h2><p id="detail">First to 15 points.</p><button id="start" type="button">▶ Play</button></div></div>
 </div>
 <div id="settingsPanel" class="settings-panel" role="dialog" aria-modal="true" aria-label="Game settings" hidden><div class="settings-dialog">
-<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.6.1</small></p>
+<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.7.0</small></p>
 <label class="settings-field">Difficulty<select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><p class="difficulty-note" id="difficultyDescription">Normal • balanced speed, timing and aim</p>
 <button id="sound" class="settings-action" type="button">🔊 Sound on</button>
 <button id="resetLearning" class="settings-action" type="button">🧠 Reset Blue AI</button>
@@ -1092,16 +1118,75 @@ function draw(){
  ctx.strokeText('OPPONENT',W*.89,82);ctx.fillText('OPPONENT',W*.89,82);
  ctx.font='bold 32px system-ui';ctx.strokeText(red.score+' : '+blue.score,netX,47);ctx.fillText(red.score+' : '+blue.score,netX,47);
 }
+// iOS Home Screen PWAs sometimes report 100dvh shorter than the actual
+// physical landscape screen at initial launch. Measure the standalone
+// viewport against device screen dimensions and repair it whenever changed.
+let lastLayoutSignature='';
+function syncGameViewport(){
+ const vw=window.visualViewport;
+ const viewportW=Math.max(1,window.innerWidth||0,document.documentElement.clientWidth||0,
+   vw?(vw.width+vw.offsetLeft):0);
+ const viewportH=Math.max(1,window.innerHeight||0,document.documentElement.clientHeight||0,
+   vw?(vw.height+vw.offsetTop):0);
+ const screenShort=Math.min(window.screen?.width||viewportW,window.screen?.height||viewportH);
+ const screenLong=Math.max(window.screen?.width||viewportW,window.screen?.height||viewportH);
+ const isIOS=/iPhone|iPad|iPod/i.test(navigator.userAgent)||
+   (navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+ const standalone=Boolean(navigator.standalone)||
+   Boolean(window.matchMedia?.('(display-mode: standalone)').matches);
+ const useScreen=isIOS&&standalone&&screenShort>0&&screenLong>0;
+ const portrait=viewportH>viewportW&&
+   isIOS&&Math.min(viewportW,viewportH)<700;
+ const shortSide=useScreen?Math.max(viewportW,screenShort):viewportW;
+ const longSide=useScreen?Math.max(viewportH,screenLong):viewportH;
+ const width=portrait?shortSide:(useScreen?Math.max(viewportW,screenLong):viewportW);
+ const height=portrait?longSide:(useScreen?Math.max(viewportH,screenShort):viewportH);
+ const signature=[portrait,width.toFixed(2),height.toFixed(2),shortSide.toFixed(2),longSide.toFixed(2)].join(':');
+ if(signature===lastLayoutSignature)return;
+ lastLayoutSignature=signature;
+ document.body.classList.toggle('portrait-landscape',portrait);
+ const style=document.documentElement.style;
+ style.setProperty('--game-screen-w',width+'px');
+ style.setProperty('--game-screen-h',height+'px');
+ style.setProperty('--game-portrait-long',longSide+'px');
+ style.setProperty('--game-portrait-short',shortSide+'px');
+}
+// Orientation requests work in some browsers but are not reliable on iOS.
+// The rotated layout above is the functional fallback.
+function requestLandscapeOrientation(){
+ try{
+  const lock=window.screen?.orientation?.lock;
+  if(typeof lock==='function'){
+   const result=lock.call(window.screen.orientation,'landscape');
+   if(result&&typeof result.catch==='function')result.catch(()=>{});
+  }
+ }catch{}
+}
 function resizeCourt(){
- const rect=stage.getBoundingClientRect();if(!rect.width||!rect.height)return;
- const newW=Math.max(700,Math.min(1500,H*rect.width/rect.height));
+ syncGameViewport();
+ // offsetWidth/Height are the UNROTATED court dimensions. Bounding rect
+ // would reverse these in portrait and squeeze the physics into a strip.
+ const courtW=stage.clientWidth,courtH=stage.clientHeight;
+ if(!courtW||!courtH)return;
+ const newW=Math.max(700,Math.min(1500,H*courtW/courtH));
  if(Math.abs(newW-W)<1)return;
  const ratio=newW/W;
  red.x*=ratio;blue.x*=ratio;ball.x*=ratio;red.vx*=ratio;blue.vx*=ratio;ball.vx*=ratio;
  W=newW;netX=W/2;canvas.width=Math.round(W);canvas.height=H;renderBackdrop();
 }
 window.addEventListener('resize',resizeCourt);
-if(window.visualViewport)window.visualViewport.addEventListener('resize',resizeCourt);
+window.addEventListener('orientationchange',()=>{
+ lastLayoutSignature='';resizeCourt();
+ setTimeout(()=>{lastLayoutSignature='';resizeCourt()},200);
+});
+window.addEventListener('pageshow',()=>{
+ lastLayoutSignature='';resizeCourt();
+ setTimeout(()=>{lastLayoutSignature='';resizeCourt()},350);
+});
+if(window.visualViewport){
+ window.visualViewport.addEventListener('resize',resizeCourt);
+ window.visualViewport.addEventListener('scroll',resizeCourt);
+}
 function loop(now){
  resizeCourt();
  const rawDelta=last?Math.max(0,Math.min(100,now-last)):0;
@@ -1171,7 +1256,7 @@ stage.addEventListener('touchmove',e=>{if(e.target.closest('[data-control]'))e.p
 window.addEventListener('blur',pauseOnExit);
 window.addEventListener('pagehide',pauseOnExit);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)pauseOnExit()});
-$('start').onclick=()=>{wakeAudio();begin()};
+$('start').onclick=()=>{wakeAudio();requestLandscapeOrientation();begin()};
 $('restart').onclick=restart;
 $('pauseBtn').onclick=()=>{wakeAudio();setPaused(!paused)};
 $('settingsButton').onclick=()=>{
@@ -1215,7 +1300,9 @@ $('historyPanel').addEventListener('pointerdown',e=>{
 document.addEventListener('keydown',e=>{
  if(e.key==='Escape'&&!$('historyPanel').hidden)closeTimeHistory()
 });
-document.body.classList.add('fullscreen'); // Automatic app-sized viewport at launch.
+document.body.classList.add('fullscreen');
+syncGameViewport();
+requestLandscapeOrientation();
 updateTimers();
 // Updates are checked on launch, resume and periodically, but never interrupt a match.
 const APP_VERSION='1.8.0';
