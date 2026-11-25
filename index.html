@@ -294,6 +294,25 @@ body.fullscreen.portrait-landscape #stage .hud .buttons{
  }
  body.fullscreen #stage .hud .settings-gear{width:44px!important}
 }
+
+/* v2.7.2: transparent HUD; retain the wide invisible 44–48px touch
+   targets and high pointer priority from v2.7.1. */
+body.fullscreen #stage .hud .mini,
+body.fullscreen #stage .hud button.clock{
+  background:transparent!important;
+  background-color:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+  border-radius:0!important;
+  color:#fff!important;
+  text-shadow:0 1px 3px rgba(0,24,42,.95),0 0 6px rgba(0,26,46,.78)!important;
+}
+body.fullscreen #stage .hud button:is(:active,.tapping){
+  background:transparent!important;
+  background-color:transparent!important;
+  border-color:transparent!important;
+  opacity:.72;
+}
 </style></head><body class="fullscreen"><main>
 <div id="stage" class="stage"><canvas id="game" width="800" height="500" aria-label="Red and blue blobs playing volleyball on a beach"></canvas>
 <div class="hud">
@@ -305,7 +324,7 @@ body.fullscreen.portrait-landscape #stage .hud .buttons{
 <div id="overlay" class="overlay"><div class="dialog"><h2 id="title">Ready to play?</h2><p id="detail">First to 15 points.</p><button id="start" type="button">▶ Play</button></div></div>
 </div>
 <div id="settingsPanel" class="settings-panel" role="dialog" aria-modal="true" aria-label="Game settings" hidden><div class="settings-dialog">
-<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.7.1</small></p>
+<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.7.2</small></p>
 <label class="settings-field">Difficulty<select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><p class="difficulty-note" id="difficultyDescription">Normal • balanced speed, timing and aim</p>
 <button id="sound" class="settings-action" type="button">🔊 Sound on</button>
 <button id="resetLearning" class="settings-action" type="button">🧠 Reset Blue AI</button>
