@@ -32,7 +32,7 @@ class FakeChannel{
  close(){this.readyState='closed';if(this.onclose)this.onclose()}
 }
 class FakeRTC{
- constructor(config){assert.deepEqual(config.iceServers,[]);this.iceGatheringState='complete';this.signalingState='stable';this.connectionState='new';clients.push(this)}
+ constructor(config){assert(Array.isArray(config.iceServers)&&config.iceServers.length===0);this.iceGatheringState='complete';this.signalingState='stable';this.connectionState='new';clients.push(this)}
  createDataChannel(){this.channel=new FakeChannel();return this.channel}
  async createOffer(){return {type:'offer',sdp:'v=0\r\na=candidate:1 1 udp 2122260223 192.168.1.20 5000 typ host\r\n'}}
  async createAnswer(){return {type:'answer',sdp:'v=0\r\na=candidate:1 1 udp 2122260223 192.168.1.21 5001 typ host\r\n'}}
@@ -80,7 +80,7 @@ async function run(){
  assert.equal(host.client._test.localCandidates('v=0\na=candidate:1 1 udp 2 192.168.0.1 500 typ host').length,1);
  await host.element('wifiCreate').fire('click');
  const offer=host.element('wifiPairingText').value;
- assert(offer&&offer.length>20,'Host must display a local offer');
+ assert(offer&&offer.length>20,'Host must display a local offer: '+host.element('wifiStatus').textContent);
  await guest.element('wifiJoin').fire('click');
  async function scan(client,code){
   const n=Math.ceil(code.length/380);
