@@ -266,9 +266,15 @@ let running=false,paused=false,matchStarted=false,matchMs=0,pointMs=0,awaitServe
 const pressed={jump:false};
 let slidePointerId=null,slideTargetX=null;
 let lastVolleySide=null,consecutiveTouches=0,touchFault=null;
-function updateMovementTarget(clientX){
+function updateMovementTarget(clientX,clientY){
  const rect=stage.getBoundingClientRect();
- const fraction=clamp((clientX-rect.left)/(rect.width*.5),0,1);
+ // In portrait the court is visually rotated 90 degrees. Finger movement
+ // along the physical phone's vertical axis is horizontal court movement.
+ const rotated=typeof document!=='undefined'&&
+   Boolean(document.body?.classList?.contains('portrait-landscape'));
+ const position=rotated?(clientY-rect.top):(clientX-rect.left);
+ const length=rotated?rect.height:rect.width;
+ const fraction=clamp(position/(length*.5),0,1);
  // Map the left 50% of the physical touchscreen to the legal Red court.
  slideTargetX=red.r+fraction*(netX-netHalf-2*red.r);
  const slider=$('movementPad');
@@ -1208,13 +1214,13 @@ movementPad.addEventListener('pointerdown',e=>{
  if(slidePointerId!==null)return;
  slidePointerId=e.pointerId;
  try{movementPad.setPointerCapture(e.pointerId)}catch{}
- updateMovementTarget(e.clientX);
+ updateMovementTarget(e.clientX,e.clientY);
  movementPad.classList.add('pressed');
 });
 movementPad.addEventListener('pointermove',e=>{
  if(e.pointerId!==slidePointerId)return;
  e.preventDefault();
- updateMovementTarget(e.clientX);
+ updateMovementTarget(e.clientX,e.clientY);
 });
 function releaseSlider(e){
  if(e.pointerId!==slidePointerId)return;
