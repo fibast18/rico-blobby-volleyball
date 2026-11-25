@@ -84,12 +84,12 @@
   connected=true;stopScan();resetQr();
   if(role==='host'){
    setStep('Step 3 of 3 — Connected! Tap Play Now to start.');
-   setStatus('Both phones are connected locally. Player 1 starts the match; Player 2 enters automatically.');
+   setStatus('Both phones are connected locally. You can tap Play Now on EITHER phone to start the same match.');
   }else{
-   setStep('Step 3 of 3 — Connected! Waiting for Player 1.');
-   setStatus('Ready to play! Player 1 must tap Play Now on the first phone. This phone joins automatically — no Play button is needed here.');
+   setStep('Step 3 of 3 — Connected! Tap Play Now to start.');
+   setStatus('Ready! Both phones are connected. You can tap Play Now here or on Player 1’s phone. The match starts simultaneously.');
   }
-  setVisible('wifiStart',role==='host');
+  setVisible('wifiStart',true);
   setVisible('wifiScan',false);
   setVisible('wifiStartNew',false);
   if(callbacks.onConnected)callbacks.onConnected(role);
@@ -175,7 +175,7 @@
    setStep('Step 2 of 3 — Show your answer QR to Player 1');
    setStatus('Preparing response for the host…');
    const code=await makeSignal('answer');showCode(code);
-   setStatus('Player 2: now hold THIS phone up to Player 1’s camera so they can scan every answer QR page. You do NOT tap Play on this phone. Once Player 1 scans your answer and taps Play Now, this phone enters automatically.');
+   setStatus('Player 2: now hold THIS phone up to Player 1’s camera so they can scan every answer QR page. After the phones connect, Play Now will appear on both devices.');
    setVisible('wifiScan',false);setVisible('wifiStartNew',false);setVisible('wifiStart',false);
   }catch(e){setStatus('Cannot join: '+e.message);closeRtc(false)}
   finally{busy=false}
@@ -281,9 +281,18 @@
    try{await receiveCode($('wifiPeerText').value.trim());$('wifiPeerText').value=''}
    catch(e){setStatus('Cannot import: '+e.message)}
   });
-  $('wifiStart').addEventListener('click',()=>{if(role==='host'&&isOpen()){
-   send({t:'start'});if(callbacks.onStart)callbacks.onStart();setVisible('wifiPanel',false);
-  }});
+  $('wifiStart').addEventListener('click',()=>{
+   if(!isOpen())return;
+   setVisible('wifiStart',false);
+   if(role==='host'){
+    send({t:'start'});
+    if(callbacks.onStart)callbacks.onStart();
+    setVisible('wifiPanel',false);
+   }else if(role==='guest'){
+    send({t:'start-request'});
+    setStatus('Request sent. Starting on both phones…');
+   }
+  });
   $('wifiPanel').addEventListener('keydown',e=>{if(e.key==='Escape'&&!connected)leave()});
  }
  function send(message){
