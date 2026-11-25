@@ -1644,6 +1644,141 @@ $('historyPanel').addEventListener('pointerdown',e=>{
 document.addEventListener('keydown',e=>{
  if(e.key==='Escape'&&!$('historyPanel').hidden)closeTimeHistory()
 });
+// Local Wi-Fi uses a direct DataChannel. Red's phone is the sole physics
+// authority; Blue's phone transmits ONLY inputs and renders snapshots.
+function localPaddleFraction(){
+ if(slideTargetX===null)return null;
+ const start=netX+netHalf+blue.r,end=W-blue.r;
+ return clamp((slideTargetX-start)/(end-start),0,1);
+}
+function sendLocalInput(){
+ if(localMode!=='guest')return;
+ LocalWifi.send({t:'input',x:localPaddleFraction(),jump:!!pressed.jump});
+}
+function sendLocalSnapshot(){
+ if(localMode!=='host')return;
+ const pack=p=>[p.x,p.y,p.vx,p.vy,p.jelly||0,p.movePhase||0,p.score||0];
+ LocalWifi.send({t:'state',id:++localSnapshotId,w:W,
+  red:pack(red),blue:pack(blue),ball:[ball.x,ball.y,ball.vx,ball.vy],
+  matchMs,pointMs,matchStarted,awaitServe,server,running,paused});
+}
+function updatePeerLabel(){
+ $('playerNameButton').classList.toggle('blue-local',localMode==='guest');
+ $('playerNameButton').textContent=playerName;
+ $('movementPad').setAttribute('aria-label',
+  localMode==='guest'?'Slide your finger to move Blue Blobby':
+   'Slide your finger to move Red Blobby');
+}
+function beginGuestMatch(){
+ if(running)recordMatchTime('restarted');
+ clearSavedMatch();newMatchIdentity();
+ red.score=0;blue.score=0;
+ matchMs=0;pointMs=0;matchStarted=false;
+ paused=false;running=true;awaitServe=true;
+ $('overlay').hidden=true;$('settingsPanel').hidden=true;
+ $('pauseBtn').textContent='⏸ Pause';
+ $('status').textContent='Playing';
+ $('wifiPanel').hidden=true;
+ updateTimers();
+}
+function receiveLocalState(data){
+ if(localMode!=='guest'||!Number.isFinite(data.w)||data.w<600||
+    !Array.isArray(data.red)||!Array.isArray(data.blue)||
+    !Array.isArray(data.ball)||data.id<=localSnapshotId)return;
+ localSnapshotId=data.id;
+ const ratio=W/data.w;
+ const receive=(obj,snapshot)=>{
+  obj.x=clamp(Number(snapshot[0])*ratio,obj.r,W-obj.r);
+  obj.y=clamp(Number(snapshot[1]),-2000,ground);
+  obj.vx=Number(snapshot[2])*ratio||0;
+  obj.vy=Number(snapshot[3])||0;
+  obj.jelly=clamp(Number(snapshot[4])||0,-.32,.32);
+  obj.movePhase=Number(snapshot[5])||0;
+  obj.score=clamp(Math.floor(Number(snapshot[6])||0),0,15);
+ };
+ receive(red,data.red);receive(blue,data.blue);
+ ball.x=clamp(Number(data.ball[0])*ratio,ball.r,W-ball.r);
+ ball.y=clamp(Number(data.ball[1]),-5000,ground);
+ ball.vx=Number(data.ball[2])*ratio||0;
+ ball.vy=Number(data.ball[3])||0;
+ matchMs=clamp(Number(data.matchMs)||0,0,24*3600*1000);
+ pointMs=clamp(Number(data.pointMs)||0,0,matchMs);
+ matchStarted=!!data.matchStarted;awaitServe=!!data.awaitServe;
+ server=data.server==='blue'?'blue':'red';
+ running=!!data.running;paused=!!data.paused;
+ $('status').textContent=running?(paused?'Paused':'Playing'):'Finished';
+ $('pauseBtn').textContent=paused?'▶ Resume':'⏸ Pause';
+ updateMovementVisual();updateTimers();
+}
+function localWifiMessage(data){
+ if(data.t==='hello'){
+  peerName=normalizePlayerName(data.name);
+  return;
+ }
+ if(localMode==='host'){
+  if(data.t==='input'){
+   if(data.x!==null&&Number.isFinite(Number(data.x)))
+    remoteInput.x=clamp(Number(data.x),0,1);
+   remoteInput.jump=!!data.jump;
+  }else if(data.t==='pause')setPaused(!!data.paused);
+  else if(data.t==='restart'){
+   begin();LocalWifi.send({t:'restart-start'});
+  }
+ }else if(localMode==='guest'){
+  if(data.t==='start'||data.t==='restart-start')beginGuestMatch();
+  else if(data.t==='state')receiveLocalState(data);
+  else if(data.t==='point'){
+   // Point data arrive BEFORE the authoritative host resets its timer.
+   red.score=clamp(Number(data.red)||0,0,15);
+   blue.score=clamp(Number(data.blue)||0,0,15);
+   pointMs=clamp(Number(data.pointMs)||0,0,24*3600*1000);
+   matchMs=clamp(Number(data.matchMs)||0,0,24*3600*1000);
+   recordPointTime(data.side==='blue'?'blue':'red');
+   playPointEndSound(data.side);
+  }else if(data.t==='end'){
+   red.score=clamp(Number(data.red)||0,0,15);
+   blue.score=clamp(Number(data.blue)||0,0,15);
+   matchMs=clamp(Number(data.matchMs)||0,0,24*3600*1000);
+   recordMatchTime('completed');
+   playRefereeWhistle('end');
+   running=false;paused=false;
+   $('title').textContent=red.score>=15?'Red wins! 🎉':'Blue wins!';
+   $('detail').textContent='Final score '+red.score+' : '+blue.score;
+   $('start').textContent='▶ Play vs AI';
+   $('overlay').hidden=false;$('status').textContent='Finished';
+   matchMs=0;pointMs=0;updateTimers();
+  }
+ }
+}
+LocalWifi.attach({
+ onConnected:role=>{
+  localMode=role;localSnapshotId=0;peerName='OPPONENT';
+  remoteInput={x:.5,jump:false};clearInput();updatePeerLabel();
+  LocalWifi.send({t:'hello',name:playerName});
+ },
+ onMessage:localWifiMessage,
+ onStart:()=>{
+  localMode='host';begin();
+  sendLocalSnapshot();
+ },
+ onDisconnected:()=>{
+  if(localMode!=='ai'){
+   running=false;paused=false;localMode='ai';
+   peerName='OPPONENT';updatePeerLabel();
+   $('title').textContent='Wi-Fi connection ended';
+   $('detail').textContent='Reconnect using Local Wi-Fi, or play against Blue AI.';
+   $('start').textContent='▶ Play vs AI';
+   $('overlay').hidden=false;$('status').textContent='Ready';
+  }
+ }
+});
+$('wifiModeButton').onclick=()=>LocalWifi.openPairing();
+$('wifiSettingsButton').onclick=()=>{
+ if(running&&localMode==='ai')setPaused(true);
+ $('settingsPanel').hidden=true;
+ LocalWifi.openPairing();
+};
+
 document.body.classList.add('fullscreen');
 syncGameViewport();
 requestLandscapeOrientation();
