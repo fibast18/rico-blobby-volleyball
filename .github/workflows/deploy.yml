@@ -26,6 +26,10 @@ jobs:
           test -s version.json
           python3 -m json.tool manifest.webmanifest >/dev/null
           node --check sw.js
+          node --check local-wifi.js
+          test -s vendor/qrcode.js
+          test -s vendor/qr-scanner.min.js
+          test -s vendor/qr-scanner-worker.min.js
           python3 - <<'PY'
           import re
           from pathlib import Path
@@ -42,6 +46,8 @@ jobs:
           node tests/touch-slider-and-rally-regression.cjs
           node tests/mobile-hud-and-timers-regression.cjs
           node tests/iphone-landscape-viewport-regression.cjs
+          node tests/local-wifi-protocol-regression.cjs
+          node tests/local-human-game-regression.cjs
           node tests/iphone-top-controls-regression.cjs
           node tests/player-name-regression.cjs
           node tests/timer-history-regression.cjs
