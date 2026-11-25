@@ -5,10 +5,20 @@
 (function(){
  'use strict';
  let callbacks={},pc=null,channel=null,role=null,phase='idle',qrPages=[],page=0,
-     cycle=null,scanner=null,fragments=new Map(),busy=false,connected=false,closedByUser=false;
+     cycle=null,scanner=null,fragments=new Map(),busy=false,connected=false,closedByUser=false,
+     qrHeld=false;
+ const QR_CHUNK_SIZE=190;
+ const QR_CYCLE_MS=8500;
  const $=id=>document.getElementById(id);
  const setStatus=s=>{$('wifiStatus').textContent=s};
  const setStep=s=>{$('wifiStep').textContent=s};
+ const setScanProgress=(done,total=0)=>{
+  $('wifiScanProgress').max=Math.max(1,total);
+  $('wifiScanProgress').value=done;
+  $('wifiScanCounter').textContent=total?
+   'Scanned '+done+' of '+total+' QR pages':
+   'Searching for the first QR page…';
+ };
  const setVisible=(id,visible)=>{$(id).hidden=!visible};
  const isOpen=()=>channel&&channel.readyState==='open';
  const rtcSupported=()=>typeof RTCPeerConnection==='function';
@@ -45,32 +55,42 @@
  }
  function resetQr(){
   if(cycle){clearInterval(cycle);cycle=null}
-  qrPages=[];page=0;$('wifiQr').replaceChildren();
-  setVisible('wifiCodeActions',false);
+  qrPages=[];page=0;qrHeld=false;$('wifiQr').replaceChildren();
+  setVisible('wifiQr',false);setVisible('wifiCodeActions',false);
  }
  function drawQr(){
   if(!qrPages.length||typeof qrcode!=='function')return;
-  const qr=qrcode(0,'L');
+  // Lower-density pages with medium error correction are easier for phone
+  // cameras to focus on than the previous 380-character QR at 215px.
+  const qr=qrcode(0,'M');
   qr.addData(qrPages[page],'Byte');
   try{
    qr.make();
-   $('wifiQr').innerHTML=qr.createSvgTag({cellSize:4,margin:4});
-   $('wifiQrCount').textContent='QR '+(page+1)+' of '+qrPages.length;
+   // Four QR modules of white quiet-zone margin improve recognition.
+   $('wifiQr').innerHTML=qr.createSvgTag({cellSize:5,margin:20});
+   $('wifiQrCount').textContent='QR '+(page+1)+' of '+qrPages.length+
+     (qrHeld?' • Held':' • 8.5 sec');
+   $('wifiHold').textContent=qrHeld?'▶ Auto':'⏸ Hold';
   }catch{setStatus('Pairing QR is too large. Use the text exchange below.')}
  }
  function showCode(code){
   resetQr();
   const token=Math.random().toString(36).slice(2,7);
-  const chunkSize=380;
+  const chunkSize=QR_CHUNK_SIZE;
   const total=Math.ceil(code.length/chunkSize);
   if(total>75)throw Error('Pairing code is too large');
   qrPages=Array.from({length:total},(_,i)=>
    'BV1.'+token+'.'+(i+1)+'.'+total+'.'+code.slice(i*chunkSize,(i+1)*chunkSize));
-  page=0;setVisible('wifiQr',true);drawQr();setVisible('wifiCodeActions',true);
+  page=0;qrHeld=false;setVisible('wifiQr',true);drawQr();
+  setVisible('wifiCodeActions',true);
   $('wifiPairingText').value=code;
-  // Rotate pages automatically, so the other phone can scan every frame.
-  if(qrPages.length>1)cycle=setInterval(()=>{if($('wifiPanel').hidden)return;
-   page=(page+1)%qrPages.length;drawQr()},2800);
+  $('wifiDialog').classList.toggle('scanning',false);
+  // Keep each QR stable long enough for focus, exposure, and decoding.
+  // The presenter can hold one page or navigate manually if needed.
+  if(qrPages.length>1)cycle=setInterval(()=>{
+   if($('wifiPanel').hidden||qrHeld)return;
+   page=(page+1)%qrPages.length;drawQr();
+  },QR_CYCLE_MS);
  }
  function closeRtc(notify=true){
   closedByUser=true;
@@ -208,8 +228,12 @@
   if(total<1||total>75||n<1||n>total||part.length>1000)throw Error('Invalid QR page index');
   let bag=fragments.get(id);
   if(!bag||bag.total!==total){bag={total,parts:new Map()};fragments.set(id,bag)}
+  const firstScan=!bag.parts.has(n);
   bag.parts.set(n,part);
-  setStatus('Scanned '+bag.parts.size+' of '+total+' QR pages. Keep both screens visible.');
+  setScanProgress(bag.parts.size,total);
+  if(firstScan&&navigator.vibrate)try{navigator.vibrate(45)}catch{}
+  setStatus('QR '+n+' captured. '+bag.parts.size+' of '+total+
+    ' pages saved. Keep scanning until all pages are collected.');
   if(bag.parts.size===total){
    fragments.delete(id);
    await receiveCode(Array.from({length:total},(_,i)=>bag.parts.get(i+1)).join(''));
@@ -218,6 +242,8 @@
  async function stopScan(){
   if(scanner){const old=scanner;scanner=null;try{old.stop();old.destroy()}catch{}}
   setVisible('wifiCamera',false);
+  setVisible('wifiScanFeedback',false);
+  $('wifiDialog').classList.toggle('scanning',false);
   setVisible('wifiQr',qrPages.length>0);
   setVisible('wifiCodeActions',qrPages.length>0);
  }
@@ -226,25 +252,29 @@
   if(!navigator.mediaDevices?.getUserMedia){
    setStatus('Camera access is unavailable. Use the pairing-text field instead.');return;
   }
-  fragments.clear();stopScan();
+  fragments.clear();await stopScan();
   if(cycle){clearInterval(cycle);cycle=null}
   setVisible('wifiQr',false);setVisible('wifiCodeActions',false);
-  setVisible('wifiCamera',true);
+  setVisible('wifiCamera',true);setVisible('wifiScanFeedback',true);
+  $('wifiDialog').classList.toggle('scanning',true);
+  setScanProgress(0);
   setStep(role==='host'?
    'Step 3 of 3 — Scan Player 2’s answer QR':
    'Step 2 of 3 — Scan Player 1’s QR');
-  setStatus('Point your camera at the other phone. Scan ALL the rotating QR pages.');
+  setStatus('Hold both phones steady, about 15–30 cm apart, with the entire QR visible. A progress counter confirms each page.');
   try{
    const QrScanner=(await import('./vendor/qr-scanner.min.js')).default;
    const video=$('wifiVideo');
    scanner=new QrScanner(video,async result=>{
     try{await receiveQr(typeof result==='string'?result:result.data)}
     catch(e){setStatus('Pairing code error: '+e.message)}
-   },{returnDetailedScanResult:true,maxScansPerSecond:6,highlightScanRegion:false});
+   },{returnDetailedScanResult:true,maxScansPerSecond:12,highlightScanRegion:true,
+       highlightCodeOutline:true,preferredCamera:'environment'});
    await scanner.start();
   }catch(e){await stopScan();setStatus('Camera unavailable: '+e.message+' — use the text exchange instead.')}
  }
  function openPairing(){
+  stopScan();resetQr();fragments.clear();
   setVisible('wifiPanel',true);setVisible('wifiStartNew',true);
   setVisible('wifiStart',false);setVisible('wifiScan',false);
   $('wifiPairingText').value='';
@@ -270,9 +300,13 @@
   $('wifiScan').addEventListener('click',startScan);
   $('wifiCancel').addEventListener('click',leave);
   $('wifiPrev').addEventListener('click',()=>{if(!qrPages.length)return;
-   page=(page+qrPages.length-1)%qrPages.length;drawQr()});
+   qrHeld=true;page=(page+qrPages.length-1)%qrPages.length;drawQr()});
   $('wifiNext').addEventListener('click',()=>{if(!qrPages.length)return;
-   page=(page+1)%qrPages.length;drawQr()});
+   qrHeld=true;page=(page+1)%qrPages.length;drawQr()});
+  $('wifiHold').addEventListener('click',()=>{
+   if(!qrPages.length)return;
+   qrHeld=!qrHeld;drawQr();
+  });
   $('wifiCopy').addEventListener('click',async()=>{
    try{await navigator.clipboard.writeText($('wifiPairingText').value);setStatus('Pairing text copied.')}
    catch{setStatus('Select and copy the text manually.')}
@@ -301,5 +335,6 @@
  }
  window.LocalWifi={attach,openPairing,leave,send,get connected(){return connected},
   get role(){return role},get active(){return !!role},get peerConnection(){return pc},
-  _test:{pack,unpack,receiveQr,localCandidates}};
+  _test:{pack,unpack,receiveQr,localCandidates,showCode,
+   get qrPages(){return [...qrPages]},get qrHeld(){return qrHeld}}};
 })();
