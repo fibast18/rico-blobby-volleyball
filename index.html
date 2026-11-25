@@ -457,6 +457,16 @@ html:fullscreen body,html:-webkit-full-screen body{
  width:100%;height:100%;margin:0;overflow:hidden;
 }
 .settings-dialog #androidFullscreen[hidden]{display:none!important}
+/* Keep the paired Wi-Fi rematch action separate from Play vs AI.
+   It remains a full-size phone touch target on both iPhone and Android. */
+.overlay .dialog #wifiRematch[hidden]{display:none!important}
+.overlay .dialog #wifiRematch{
+ background:#ffe07a;color:#19374c;min-height:48px;
+ padding:12px 17px;margin:9px auto 2px;
+ font-size:clamp(15px,2.2vw,19px);width:min(100%,315px);
+ touch-action:manipulation;
+}
+.overlay .dialog #wifiRematch:disabled{opacity:.7;cursor:progress}
 </style></head><body class="fullscreen"><main>
 <div id="stage" class="stage"><canvas id="game" width="800" height="500" aria-label="Red and blue blobs playing volleyball on a beach"></canvas>
 <div class="hud">
@@ -466,7 +476,7 @@ html:fullscreen body,html:-webkit-full-screen body{
 <button id="playerNameButton" type="button" class="player-name-button" aria-label="Change your player name" aria-haspopup="dialog">PLAYER</button>
 <div id="message" class="message" hidden aria-live="polite"></div>
 <div class="controls" id="controls"><div class="control" id="movementPad" data-control="slide" role="slider" aria-label="Slide your finger left or right to move Red Blobby" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" tabindex="0"><span class="slide-track"><span class="slide-thumb" id="slideThumb"></span></span></div><button class="control" type="button" data-control="jump" aria-label="Jump anywhere on the right half of the court"></button></div>
-<div id="overlay" class="overlay"><div class="dialog"><h2 id="title">Ready to play?</h2><p id="detail">First to 15 points.</p><button id="start" type="button">▶ Play vs AI</button><button id="wifiModeButton" type="button" class="wifi-mode-button">📶 Local Wi-Fi — 2 Players</button></div></div>
+<div id="overlay" class="overlay"><div class="dialog"><h2 id="title">Ready to play?</h2><p id="detail">First to 15 points.</p><button id="start" type="button">▶ Play vs AI</button><button id="wifiRematch" type="button" hidden>↻ Play Again — Same Wi-Fi</button><button id="wifiModeButton" type="button" class="wifi-mode-button">📶 Local Wi-Fi — 2 Players</button></div></div>
 </div>
 <div id="playerNamePanel" class="player-name-panel" role="dialog" aria-modal="true" aria-labelledby="playerNameTitle" hidden>
  <form id="playerNameForm" class="player-name-dialog">
@@ -516,7 +526,7 @@ html:fullscreen body,html:-webkit-full-screen body{
  </section>
 </div>
 <div id="settingsPanel" class="settings-panel" role="dialog" aria-modal="true" aria-label="Game settings" hidden><div class="settings-dialog">
-<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.8.4</small></p>
+<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.8.5</small></p>
 <label class="settings-field">Difficulty<select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><p class="difficulty-note" id="difficultyDescription">Normal • balanced speed, timing and aim</p>
 <button id="sound" class="settings-action" type="button">🔊 Sound on</button>
 <button id="resetLearning" class="settings-action" type="button">🧠 Reset Blue AI</button>
@@ -940,13 +950,22 @@ function serveReset(side='red'){
  ball.y=ground-170;ball.vx=0;ball.vy=0;awaitServe=true;pointMs=0;scoreTimer=0;serveDelay=0;rallyTicks=0;lastTouch=null;touchLock=0;cpuJumpCooldown=0;cpuJumpArmed=true;cpuJumpPlan=null;clearInput();
  $('message').textContent=side==='red'?'Jump to serve from your court':'Blue serves next';
 }
+function setLocalRematchAvailable(available){
+ const button=$('wifiRematch');
+ button.hidden=!available;
+ button.disabled=false;
+ button.textContent='↻ Play Again — Same Wi-Fi';
+}
 function begin(){
- if(applyPendingUpdate())return;
+ // Reloading for an app update while WebRTC is connected would discard
+ // the local peer session and force another QR exchange.
+ if(localMode==='ai'&&applyPendingUpdate())return;
  playRefereeWhistle('start');
  if(running)recordMatchTime('restarted');
  clearSavedMatch();lastSnapshotMs=0;newMatchIdentity();
  updateLearningLabel();
  red.score=0;blue.score=0;frame=0;
+ setLocalRematchAvailable(false);
  matchMs=0;pointMs=0;matchStarted=false;paused=false;
  serveReset('red');running=true;
  $('overlay').hidden=true;$('settingsPanel').hidden=true;
@@ -957,7 +976,7 @@ function begin(){
  updateTimers();
 }
 function restart(){
- if(applyPendingUpdate())return;
+ if(localMode==='ai'&&applyPendingUpdate())return;
  if(localMode==='guest'){LocalWifi.send({t:'restart'});return}
  begin();
  if(localMode==='host')LocalWifi.send({t:'restart-start'});
@@ -972,6 +991,7 @@ function finish(){
  $('title').textContent=red.score>=15?'Red wins! 🎉':'Blue wins!';
  $('detail').textContent='Final score '+finalScore;
  $('start').textContent=localMode==='host'?'▶ Play vs AI':'↻ Play Again';
+ setLocalRematchAvailable(localMode==='host'&&LocalWifi.connected);
  $('overlay').hidden=false;
  $('status').textContent='Finished';
  $('pauseBtn').textContent='⏸ Pause';
@@ -1802,6 +1822,8 @@ function beginGuestMatch(){
  playRefereeWhistle('start');
  if(running)recordMatchTime('restarted');
  clearSavedMatch();newMatchIdentity();
+ clearInput();
+ setLocalRematchAvailable(false);
  red.score=0;blue.score=0;
  matchMs=0;pointMs=0;matchStarted=false;
  paused=false;running=true;awaitServe=true;
@@ -1840,13 +1862,35 @@ function receiveLocalState(data){
  $('pauseBtn').textContent=paused?'▶ Resume':'⏸ Pause';
  updateMovementVisual();updateTimers();
 }
+// Only the Red host starts the physics simulation. The guest can request
+// a rematch, but never runs a second independent game clock or ball.
+function startLocalRematch(){
+ if(localMode!=='host'||!LocalWifi.connected||running)return false;
+ remoteInput={x:.5,jump:false};
+ if(!LocalWifi.send({t:'rematch-start'}))return false;
+ begin();
+ sendLocalSnapshot();
+ return true;
+}
+function requestLocalRematch(){
+ if(!LocalWifi.connected||running)return;
+ if(localMode==='host'){startLocalRematch();return}
+ if(localMode!=='guest')return;
+ if(LocalWifi.send({t:'rematch-request'})){
+  const button=$('wifiRematch');
+  button.disabled=true;
+  button.textContent='Waiting for other phone…';
+ }
+}
 function localWifiMessage(data){
  if(data.t==='hello'){
   peerName=normalizePlayerName(data.name);
   return;
  }
  if(localMode==='host'){
-  if(data.t==='start-request'&&LocalWifi.connected&&!running){
+  if(data.t==='rematch-request'){
+   startLocalRematch();
+  }else if(data.t==='start-request'&&LocalWifi.connected&&!running){
    LocalWifi.send({t:'start'});
    begin();
    $('wifiPanel').hidden=true;
@@ -1860,7 +1904,8 @@ function localWifiMessage(data){
    begin();LocalWifi.send({t:'restart-start'});
   }
  }else if(localMode==='guest'){
-  if(data.t==='start'||data.t==='restart-start')beginGuestMatch();
+  if(data.t==='start'||data.t==='restart-start'||data.t==='rematch-start')
+   beginGuestMatch();
   else if(data.t==='hit')playTone(390);
   else if(data.t==='state')receiveLocalState(data);
   else if(data.t==='point'){
@@ -1881,6 +1926,7 @@ function localWifiMessage(data){
    $('title').textContent=red.score>=15?'Red wins! 🎉':'Blue wins!';
    $('detail').textContent='Final score '+blue.score+' : '+red.score;
    $('start').textContent='▶ Play vs AI';
+   setLocalRematchAvailable(LocalWifi.connected);
    $('overlay').hidden=false;$('status').textContent='Finished';
    matchMs=0;pointMs=0;updateTimers();
   }
@@ -1889,6 +1935,7 @@ function localWifiMessage(data){
 LocalWifi.attach({
  onConnected:role=>{
   localMode=role;localSnapshotId=0;peerName='OPPONENT';
+  setLocalRematchAvailable(false);
   remoteInput={x:.5,jump:false};clearInput();updatePeerLabel();
   LocalWifi.send({t:'hello',name:playerName});
  },
@@ -1900,6 +1947,7 @@ LocalWifi.attach({
  onDisconnected:()=>{
   if(localMode!=='ai'){
    running=false;paused=false;localMode='ai';
+   setLocalRematchAvailable(false);
    peerName='OPPONENT';updatePeerLabel();
    $('title').textContent='Wi-Fi connection ended';
    $('detail').textContent='Reconnect using Local Wi-Fi, or play against Blue AI.';
@@ -1908,6 +1956,11 @@ LocalWifi.attach({
   }
  }
 });
+$('wifiRematch').onclick=()=>{
+ requestImmersiveGameFullscreen();
+ wakeAudio();
+ requestLocalRematch();
+};
 $('wifiModeButton').onclick=()=>{
  requestImmersiveGameFullscreen();wakeAudio();LocalWifi.openPairing();
 };
