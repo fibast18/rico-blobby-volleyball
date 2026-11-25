@@ -361,6 +361,58 @@ body.fullscreen #stage .hud button:is(:active,.tapping){
  .player-name-dialog{gap:7px;padding:12px 16px}
  .player-name-dialog h2{font-size:17px}
 }
+
+/* v2.8: Phone-agnostic responsive pairing UI and multiplayer touch layout. */
+.overlay .dialog .wifi-mode-button{display:block;margin:10px auto 0;
+ background:transparent;border:1px solid rgba(255,255,255,.55);color:#fff;
+ font-size:15px;padding:11px 15px;min-height:44px;}
+.wifi-panel[hidden],.wifi-camera[hidden],.wifi-code-actions[hidden],
+.wifi-actions [hidden]{display:none!important}
+.wifi-panel{position:fixed;inset:0;z-index:1100;display:grid;place-items:center;
+ background:rgba(0,24,43,.91);touch-action:auto!important;
+ padding:max(7px,env(safe-area-inset-top,0px)) max(8px,env(safe-area-inset-right,0px))
+ max(7px,env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));}
+.wifi-dialog{width:min(760px,100%);max-height:100%;overflow-y:auto;
+ background:#073956;border:1px solid #ffffff40;border-radius:15px;
+ padding:12px 15px;display:grid;grid-template-columns:minmax(0,1fr) minmax(150px,220px);
+ column-gap:15px;row-gap:7px;align-items:center;}
+.wifi-heading{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:9px}
+.wifi-heading h2{font-size:clamp(15px,2.5vw,21px);margin:0}
+.wifi-heading button{background:transparent;color:#fff;border:0;font-size:23px;min-width:44px;min-height:44px}
+.wifi-notice{grid-column:1/-1;font-size:12px;margin:0;color:#d6e9f8;line-height:1.3}
+#wifiStatus{grid-column:1;font-size:13px;line-height:1.3;min-height:48px;margin:0}
+.wifi-actions{grid-column:1;display:flex;gap:8px;flex-wrap:wrap}
+.wifi-dialog button{min-height:44px;border:1px solid #ffffff55;border-radius:10px;
+ padding:8px 13px;background:#d9eeff;color:#123b55;font:700 13px system-ui;touch-action:manipulation}
+#wifiStart{background:#ffd365}
+.wifi-qr{grid-column:2;grid-row:3/span 4;display:grid;place-items:center;align-self:center;
+ min-height:90px;min-width:0}
+.wifi-qr:empty{display:none}
+.wifi-qr svg{width:min(100%,215px);height:auto;max-height:50dvh;border:5px solid white;
+ background:#fff;border-radius:6px;display:block}
+.wifi-code-actions{grid-column:2;display:flex;gap:7px;justify-content:center;align-items:center;
+ white-space:nowrap;font-size:12px}
+.wifi-code-actions button{min-width:44px}
+.wifi-camera{grid-column:2;grid-row:3/span 4;position:relative}
+.wifi-camera video{max-width:100%;max-height:48dvh;border-radius:8px;background:#122a3d}
+.wifi-help{grid-column:1/-1;font-size:11px;margin:3px 0;color:#c5dded;line-height:1.4}
+.wifi-text-fallback{grid-column:1/-1;font-size:12px}
+.wifi-text-fallback summary{cursor:pointer;padding:5px 0}
+.wifi-text-fallback label{display:block;margin:5px 0}
+.wifi-text-fallback textarea{width:100%;min-height:42px;font:10px/1.3 monospace;
+ background:#eaf5ff;color:#1b3347;border-radius:7px;padding:5px;resize:vertical}
+.wifi-text-fallback button{margin:4px 0}
+body.fullscreen #stage .hud .left-hud,body.fullscreen #stage .hud .buttons{max-width:48%}
+@media(max-width:590px),(max-height:380px){
+ .wifi-dialog{grid-template-columns:minmax(0,1fr) minmax(95px,32%);padding:8px;gap:5px}
+ .wifi-heading h2{font-size:15px}
+ .wifi-dialog button{font-size:12px;padding:4px 8px;min-height:40px}
+ .wifi-qr svg{max-height:46dvh}
+ .wifi-notice,.wifi-help{font-size:10px}
+ #wifiStatus{font-size:11px}
+ body.fullscreen #stage .hud button.mini,body.fullscreen #stage .hud button.clock{
+  font-size:11px!important;padding:0 5px!important}
+}
 </style></head><body class="fullscreen"><main>
 <div id="stage" class="stage"><canvas id="game" width="800" height="500" aria-label="Red and blue blobs playing volleyball on a beach"></canvas>
 <div class="hud">
@@ -370,7 +422,7 @@ body.fullscreen #stage .hud button:is(:active,.tapping){
 <button id="playerNameButton" type="button" class="player-name-button" aria-label="Change your player name" aria-haspopup="dialog">PLAYER</button>
 <div id="message" class="message" hidden aria-live="polite"></div>
 <div class="controls" id="controls"><div class="control" id="movementPad" data-control="slide" role="slider" aria-label="Slide your finger left or right to move Red Blobby" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" tabindex="0"><span class="slide-track"><span class="slide-thumb" id="slideThumb"></span></span></div><button class="control" type="button" data-control="jump" aria-label="Jump anywhere on the right half of the court"></button></div>
-<div id="overlay" class="overlay"><div class="dialog"><h2 id="title">Ready to play?</h2><p id="detail">First to 15 points.</p><button id="start" type="button">▶ Play</button></div></div>
+<div id="overlay" class="overlay"><div class="dialog"><h2 id="title">Ready to play?</h2><p id="detail">First to 15 points.</p><button id="start" type="button">▶ Play vs AI</button><button id="wifiModeButton" type="button" class="wifi-mode-button">📶 Local Wi-Fi — 2 Players</button></div></div>
 </div>
 <div id="playerNamePanel" class="player-name-panel" role="dialog" aria-modal="true" aria-labelledby="playerNameTitle" hidden>
  <form id="playerNameForm" class="player-name-dialog">
@@ -383,11 +435,40 @@ body.fullscreen #stage .hud button:is(:active,.tapping){
   </div>
  </form>
 </div>
+
+<div id="wifiPanel" class="wifi-panel" role="dialog" aria-modal="true" aria-label="Local Wi-Fi Multiplayer" hidden>
+ <section class="wifi-dialog">
+  <div class="wifi-heading"><h2>📶 Local Wi-Fi Multiplayer</h2><button id="wifiCancel" type="button" aria-label="Close Wi-Fi pairing">✕</button></div>
+  <p class="wifi-notice">Two smartphones on the <strong>same Wi-Fi or phone hotspot</strong>. No mobile data, account, Bluetooth, cloud server or online opponent.</p>
+  <p id="wifiStatus" role="status" aria-live="polite">Choose Create or Join.</p>
+  <div id="wifiStartNew" class="wifi-actions"><button id="wifiCreate" type="button">1. Create (Red)</button><button id="wifiJoin" type="button">2. Join (Blue)</button></div>
+  <div id="wifiQr" class="wifi-qr" aria-label="Pairing QR code"></div>
+  <div id="wifiCodeActions" class="wifi-code-actions" hidden>
+   <button id="wifiPrev" type="button">◀</button><span id="wifiQrCount">QR 1 of 1</span>
+   <button id="wifiNext" type="button">▶</button>
+  </div>
+  <div id="wifiCamera" class="wifi-camera" hidden><video id="wifiVideo" playsinline muted autoplay></video></div>
+  <div class="wifi-actions">
+   <button id="wifiScan" type="button" hidden>Scan QR</button>
+   <button id="wifiStart" type="button" hidden>▶ Start Match</button>
+  </div>
+  <details class="wifi-text-fallback">
+   <summary>Manual pairing text (if camera is unavailable)</summary>
+   <label for="wifiPairingText">Your pairing data</label>
+   <textarea id="wifiPairingText" readonly rows="2" spellcheck="false"></textarea>
+   <button id="wifiCopy" type="button">Copy your pairing data</button>
+   <label for="wifiPeerText">Paste pairing data from the other phone</label>
+   <textarea id="wifiPeerText" rows="2" spellcheck="false"></textarea>
+   <button id="wifiImport" type="button">Import peer data</button>
+  </details>
+  <p class="wifi-help">First open the game online once on both phones to cache it. After that, connect to the same local Wi-Fi or hotspot. Create on one phone, Join and scan on the second, then scan its answer back on the first phone. QR pages rotate automatically.</p>
+ </section>
+</div>
 <div id="settingsPanel" class="settings-panel" role="dialog" aria-modal="true" aria-label="Game settings" hidden><div class="settings-dialog">
-<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.7.3</small></p>
+<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.8.0</small></p>
 <label class="settings-field">Difficulty<select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><p class="difficulty-note" id="difficultyDescription">Normal • balanced speed, timing and aim</p>
 <button id="sound" class="settings-action" type="button">🔊 Sound on</button>
-<button id="resetLearning" class="settings-action" type="button">🧠 Reset Blue AI</button>
+<button id="resetLearning" class="settings-action" type="button">🧠 Reset Blue AI</button><button id="wifiSettingsButton" class="settings-action" type="button">📶 Local Wi-Fi Multiplayer</button>
 <p class="developer">Developed by: Engr. Rico J. Pono</p>
 <button id="closeSettings" class="settings-close" type="button">Close</button>
 </div></div>
@@ -403,6 +484,7 @@ body.fullscreen #stage .hud button:is(:active,.tapping){
   <p class="history-note">Saved on this device • Pause time excluded</p>
  </div>
 </div>
+<script src="./vendor/qrcode.js"></script><script src="./local-wifi.js"></script>
 <script>
 (()=>{'use strict';
 const $=id=>document.getElementById(id),stage=$('stage'),canvas=$('game'),ctx=canvas.getContext('2d');
@@ -411,6 +493,8 @@ const red={x:195,y:ground,vy:0,vx:0,r:49.45,score:0,jelly:0,jellyV:0,movePhase:0
 const ball={x:195,y:260,vx:0,vy:0,r:36};
 let running=false,paused=false,matchStarted=false,matchMs=0,pointMs=0,awaitServe=true,last=0,frame=0,sound=true,audio=null,scoreTimer=0,server='red',serveDelay=0,rallyTicks=0,lastTouch=null,touchLock=0,cpuJumpCooldown=0,cpuJumpArmed=true,cpuJumpPlan=null;
 const pressed={jump:false};
+let localMode='ai',peerName='OPPONENT',remoteInput={x:.5,jump:false};
+let lastRemoteFrame=0,lastInputFrame=0,localSnapshotId=0;
 let slidePointerId=null,slideTargetX=null;
 let lastVolleySide=null,consecutiveTouches=0,touchFault=null;
 // Per-device player label. Keep saved names out of HTML so user input is
