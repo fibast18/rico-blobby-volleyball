@@ -87,4 +87,29 @@ classes.delete('portrait-landscape');
 vm.runInContext('updateMovementTarget(239,190)',ctx);
 assert(Math.abs(ctx.slideTargetX-expected)<.01,
  'Landscape touch should still use the usual physical X position');
-console.log('iPhone screen-gap, portrait rotation, aspect and slide controls passed.');
+// Android phones also need the landscape-rendered fallback and safe sizing.
+navigator.userAgent='Mozilla/5.0 (Linux; Android 15; Pixel 9; Mobile)';
+navigator.standalone=false;
+window.screen.width=393;window.screen.height=873;
+window.innerWidth=393;window.innerHeight=873;
+visualViewport.width=393;visualViewport.height=873;
+document.documentElement.clientWidth=393;document.documentElement.clientHeight=873;
+vm.runInContext('syncGameViewport()',ctx);
+assert(classes.has('portrait-landscape'),
+ 'Android portrait phone must render a landscape court even without orientation lock');
+assert.equal(styles.get('--game-portrait-long'),'873px');
+assert.equal(styles.get('--game-portrait-short'),'393px');
+window.innerWidth=873;window.innerHeight=393;
+visualViewport.width=873;visualViewport.height=393;
+document.documentElement.clientWidth=873;document.documentElement.clientHeight=393;
+vm.runInContext('syncGameViewport()',ctx);
+assert(!classes.has('portrait-landscape'),'Rotating Android to landscape must remove visual transform');
+assert.equal(styles.get('--game-screen-w'),'873px');
+assert.equal(styles.get('--game-screen-h'),'393px');
+ctx.localMode='guest';ctx.blue.r=49.45;
+vm.runInContext('updateMovementTarget(219,150)',ctx);
+const guestMin=ctx.netX+ctx.netHalf+ctx.blue.r;
+const guestMax=ctx.W-ctx.blue.r;
+assert(Math.abs(ctx.slideTargetX-(guestMin+(guestMax-guestMin)*.5))<.01,
+ 'On different phone sizes, guest finger tracking should map onto Blue court');
+console.log('iPhone and Android screen sizing, rotation and both-player touch mappings passed.');
