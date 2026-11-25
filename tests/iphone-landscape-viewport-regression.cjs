@@ -71,7 +71,7 @@ assert(beginMove>=0&&endMove>beginMove,'Production touch mapping missing');
 const slider={value:null,setAttribute(_name,value){this.value=Number(value)}};
 ctx.$=()=>slider;ctx.clamp=(x,min,max)=>Math.max(min,Math.min(max,x));
 ctx.netHalf=7;ctx.red.r=49.45;
-ctx.slideTargetX=null;
+ctx.slideTargetX=null;ctx.localMode='ai';
 stage.getBoundingClientRect=()=>classes.has('portrait-landscape')?
  {left:0,top:0,width:440,height:956}:
  {left:0,top:0,width:956,height:440};
