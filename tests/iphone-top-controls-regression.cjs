@@ -23,7 +23,7 @@ assert(page.includes('z-index:30!important;'),'HUD must sit above both touch cou
 assert(page.includes('touch-action:manipulation!important;'),'iPhone buttons must allow direct taps');
 assert(page.includes('env(safe-area-inset-top,0px)'),'Top buttons must avoid iOS status/gesture areas');
 const from=page.indexOf('function bindHudButton(id,handler){');
-const to=page.indexOf("bindHudButton('restart',restart);",from);
+const to=page.indexOf("$('playerNameButton').textContent=playerName;",from);
 assert(from>=0&&to>from,'Production HUD pointer handler is missing');
 const all=new Map();
 function makeButton(){
