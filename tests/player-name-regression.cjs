@@ -30,7 +30,7 @@ for(const id of ['playerNameButton','playerNamePanel','playerNameInput']){
 let pauses=[];
 const ctx={
  localStorage:{getItem:k=>saved.get(k)??null,setItem:(k,v)=>saved.set(k,v)},
- $:id=>elements[id],running:true,paused:false,
+ $:id=>elements[id],running:true,paused:false,localMode:'ai',
  setPaused:value=>{ctx.paused=value;pauses.push(value)},
  document:{hidden:false}
 };
