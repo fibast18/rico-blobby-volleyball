@@ -4,7 +4,7 @@
 // sends a synthetic click; keyboard/mouse click must remain usable.
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const page=fs.readFileSync('index.html','utf8');
-const ids=['restart','pauseBtn','settingsButton','matchTimer','pointTimer'];
+const ids=['restart','pauseBtn','settingsButton','matchTimer','pointTimer','playerNameButton'];
 for(const id of ids)assert(page.includes("bindHudButton('"+id+"'"),
  'The '+id+' control must use immediate touch activation');
 const transparentHud=page.slice(page.indexOf('/* v2.7.2: transparent HUD;'));
@@ -39,7 +39,7 @@ function makeButton(){
   }
  };
 }
-const ctx={$:id=>all.get(id)};
+const ctx={$:id=>all.get(id),playerName:'PLAYER',openPlayerNameEditor:()=>{}};
 for(const id of ids)all.set(id,makeButton());
 vm.createContext(ctx);
 vm.runInContext(page.slice(from,to),ctx,{timeout:1000});
