@@ -8,6 +8,7 @@
      cycle=null,scanner=null,fragments=new Map(),busy=false,connected=false,closedByUser=false;
  const $=id=>document.getElementById(id);
  const setStatus=s=>{$('wifiStatus').textContent=s};
+ const setStep=s=>{$('wifiStep').textContent=s};
  const setVisible=(id,visible)=>{$(id).hidden=!visible};
  const isOpen=()=>channel&&channel.readyState==='open';
  const rtcSupported=()=>typeof RTCPeerConnection==='function';
@@ -81,9 +82,13 @@
  function handleOpen(){
   if(connected||!isOpen())return;
   connected=true;stopScan();resetQr();
-  setStatus(role==='host'?
-   'Connected on local Wi-Fi. Tap Start Match to begin.':
-   'Connected to host. The host can start your match.');
+  if(role==='host'){
+   setStep('Step 3 of 3 — Connected! Tap Play Now to start.');
+   setStatus('Both phones are connected locally. Player 1 starts the match; Player 2 enters automatically.');
+  }else{
+   setStep('Step 3 of 3 — Connected! Waiting for Player 1.');
+   setStatus('Ready to play! Player 1 must tap Play Now on the first phone. This phone joins automatically — no Play button is needed here.');
+  }
   setVisible('wifiStart',role==='host');
   setVisible('wifiScan',false);
   setVisible('wifiStartNew',false);
@@ -149,12 +154,13 @@
    stopScan();resetQr();prepareConnection(true);phase='answer';
    const data=pc.createDataChannel('blobby-local',{ordered:true});
    attachChannel(data);
+   setStep('Step 2 of 3 — Share this QR with Player 2');
    setStatus('Creating offline Wi-Fi offer…');
    await pc.setLocalDescription(await pc.createOffer());
    const code=await makeSignal('offer');
    showCode(code);
-   setStatus('Player 1: show these QR pages to Player 2. Player 2 chooses Join and scans them. Then tap Scan Answer to scan Player 2’s QR pages.');
-   setVisible('wifiScan',true);$('wifiScan').textContent='Scan Answer';
+   setStatus('Player 1: Player 2 should scan ALL the QR pages shown here. When Player 2 shows an Answer QR, tap the button below to scan that QR back.');
+   setVisible('wifiScan',true);$('wifiScan').textContent='📷 Scan Player 2 Answer QR';
    setVisible('wifiStartNew',false);setVisible('wifiStart',false);
   }catch(e){setStatus('Cannot create room: '+e.message);closeRtc(false)}
   finally{busy=false}
@@ -166,9 +172,10 @@
    phase='offer';
    await pc.setRemoteDescription({type:'offer',sdp:payload.sdp});
    await pc.setLocalDescription(await pc.createAnswer());
+   setStep('Step 2 of 3 — Show your answer QR to Player 1');
    setStatus('Preparing response for the host…');
    const code=await makeSignal('answer');showCode(code);
-   setStatus('Player 2: show these QR pages to Player 1. Ask Player 1 to tap Scan Answer and scan all pages.');
+   setStatus('Player 2: now hold THIS phone up to Player 1’s camera so they can scan every answer QR page. You do NOT tap Play on this phone. Once Player 1 scans your answer and taps Play Now, this phone enters automatically.');
    setVisible('wifiScan',false);setVisible('wifiStartNew',false);setVisible('wifiStart',false);
   }catch(e){setStatus('Cannot join: '+e.message);closeRtc(false)}
   finally{busy=false}
@@ -177,7 +184,10 @@
   if(!pc||role!=='host')throw Error('Create a room before scanning the answer.');
   if(pc.signalingState!=='have-local-offer')throw Error('This offer was already answered.');
   await pc.setRemoteDescription({type:'answer',sdp:payload.sdp});
-  setStatus('Answer received. Connecting locally…');
+  await stopScan();
+  resetQr();setVisible('wifiQr',false);
+  setStep('Step 3 of 3 — Answer scanned; connecting both phones…');
+  setStatus('Player 1: answer accepted. Connecting locally. The yellow Play Now button appears when both devices connect.');
   setVisible('wifiScan',false);
  }
  async function receiveCode(code){
@@ -220,7 +230,10 @@
   if(cycle){clearInterval(cycle);cycle=null}
   setVisible('wifiQr',false);setVisible('wifiCodeActions',false);
   setVisible('wifiCamera',true);
-  setStatus('Point your camera at the other phone. Scan all rotating QR pages.');
+  setStep(role==='host'?
+   'Step 3 of 3 — Scan Player 2’s answer QR':
+   'Step 2 of 3 — Scan Player 1’s QR');
+  setStatus('Point your camera at the other phone. Scan ALL the rotating QR pages.');
   try{
    const QrScanner=(await import('./vendor/qr-scanner.min.js')).default;
    const video=$('wifiVideo');
@@ -235,7 +248,8 @@
   setVisible('wifiPanel',true);setVisible('wifiStartNew',true);
   setVisible('wifiStart',false);setVisible('wifiScan',false);
   $('wifiPairingText').value='';
-  setStatus('Same Wi-Fi or one phone’s hotspot only. No internet server or Bluetooth. Each phone must first have the game installed and cached.');
+  setStep('Step 1 of 3 — Choose Create or Join');
+  setStatus('Connect both phones to the same Wi-Fi or phone hotspot. Choose Create on the first phone and Join on the second. No Bluetooth or online game server.');
   if(!rtcSupported())setStatus('This browser does not support WebRTC. Try a recent Safari or Chrome.');
  }
  function leave(){
@@ -246,9 +260,12 @@
   callbacks=config||{};
   $('wifiCreate').addEventListener('click',createHost);
   $('wifiJoin').addEventListener('click',()=>{closeRtc(false);role='guest';phase='offer';
-   resetQr();setVisible('wifiScan',true);$('wifiScan').textContent='Scan Host QR';
+   resetQr();setVisible('wifiQr',false);
+   setVisible('wifiStartNew',false);
+   setVisible('wifiScan',true);$('wifiScan').textContent='📷 Scan Player 1 QR';
    setVisible('wifiStart',false);
-   setStatus('Player 2: tap Scan Host QR and scan the QR pages from Player 1.');
+   setStep('Step 2 of 3 — Scan Player 1’s QR');
+   setStatus('Player 2: tap Scan Player 1 QR and scan ALL the QR pages shown on the first phone. Then your phone will show an answer QR.');
   });
   $('wifiScan').addEventListener('click',startScan);
   $('wifiCancel').addEventListener('click',leave);
