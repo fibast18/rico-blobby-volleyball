@@ -9,7 +9,8 @@ assert(!/stun:|turn:|navigator\.bluetooth|new WebSocket|fetch\(/i.test(source),
  'Offline multiplayer may not depend on internet, Bluetooth, or cloud signaling');
 assert(html.includes('id="wifiCreate"')&&html.includes('id="wifiJoin"')&&
  html.includes('id="wifiScan"')&&html.includes('id="wifiStart"')&&
- html.includes('id="wifiStep"'),
+ html.includes('id="wifiStep"')&&html.includes('id="wifiScanProgress"')&&
+ html.includes('id="wifiHold"'),
  'A local host, guest, visible step guide, QR scanner and Start flow must exist');
 assert(html.includes('.wifi-actions[hidden]'),
  'The previous Create/Join choices must be truly hidden after choosing a role');
@@ -26,8 +27,12 @@ assert(html.includes("onDisconnected:"),'Wi-Fi link failures must pause/close th
 const qrctx={};vm.createContext(qrctx);
 vm.runInContext(fs.readFileSync('vendor/qrcode.js','utf8'),qrctx,{timeout:2000});
 assert.equal(typeof qrctx.qrcode,'function','Bundled QR library missing');
-const qr=qrctx.qrcode(0,'L');qr.addData('BV1.abc.1.2.'+'a'.repeat(380),'Byte');
+const qr=qrctx.qrcode(0,'M');qr.addData('BV1.abc.1.3.'+'a'.repeat(190),'Byte');
 qr.make();assert(qr.getModuleCount()>0,'QR page must be scannable without internet');
+assert(qr.getModuleCount()<=65,'Pairing QR must be simpler than the previous dense 380-character version');
+assert(source.includes('QR_CYCLE_MS=8500'),'QR pages should stay visible at least 8 seconds');
+assert(source.includes('margin:20'),'QR quiet zone must be at least four SVG modules');
+assert(source.includes("maxScansPerSecond:12"),'Camera must have a responsive frame scan rate');
 assert(qr.createSvgTag({cellSize:2,margin:2}).includes('<svg'),'QR generator must draw SVG');
 
 const clients=[];
@@ -50,7 +55,10 @@ class FakeRTC{
 function createPeer(){
  const widgets=new Map();
  function element(id){if(!widgets.has(id)){
-  const listeners={};const o={id,hidden:true,textContent:'',value:'',innerHTML:'',listeners,
+  const listeners={};const classes=new Set();
+  const o={id,hidden:true,textContent:'',value:'',innerHTML:'',listeners,
+   classList:{toggle(name,on){if(on)classes.add(name);else classes.delete(name)},
+    contains(name){return classes.has(name)}},
    addEventListener(name,fn){(listeners[name]??=[]).push(fn)},
    async fire(name){await Promise.all((listeners[name]||[]).map(fn=>fn({preventDefault(){}})))},
    replaceChildren(){this.innerHTML=''}
@@ -86,27 +94,42 @@ async function run(){
  await host.element('wifiCreate').fire('click');
  const offer=host.element('wifiPairingText').value;
  assert(offer&&offer.length>20,'Host must display a local offer: '+host.element('wifiStatus').textContent);
+ assert(host.element('wifiDialog').classList.contains('presenting'),
+  'When showing QR, simplify pairing UI to make it large');
+ const pages=host.client._test.qrPages;
+ assert(pages.length>0,'Host must generate QR pages');
+ assert(pages.every(p=>p.length<=210),'Individual QR payload should remain small enough for smartphone cameras');
+ if(pages.length>1){
+  assert(pages.every((p,i)=>p.startsWith('BV1.')&&p.includes('.'+(i+1)+'.'+pages.length+'.')),
+   'QR pages must be ordered and labeled');
+  await host.element('wifiHold').fire('click');
+  assert(host.client._test.qrHeld,'Presenter can freeze a QR for slow camera focus');
+  await host.element('wifiNext').fire('click');
+  assert(host.client._test.qrHeld,'Manual QR navigation must not resume fast cycling');
+  await host.element('wifiHold').fire('click');
+  assert(!host.client._test.qrHeld,'Presenter can resume auto cycling');
+ }
  assert.equal(host.element('wifiStartNew').hidden,true,'Host must hide initial Create/Join buttons after room creation');
  assert.equal(host.element('wifiScan').hidden,false,'Host must display Scan Player 2 Answer QR');
  assert(host.element('wifiStep').textContent.includes('Step 2'),'Host must explain the QR exchange');
  await guest.element('wifiJoin').fire('click');
  assert.equal(guest.element('wifiStartNew').hidden,true,'Guest must hide initial Create/Join buttons');
  assert.equal(guest.element('wifiStart').hidden,true,'Guest Play must not appear before connection');
- async function scan(client,code){
-  const n=Math.ceil(code.length/380);
-  for(let i=0;i<n;i++){
-   const txt='BV1.abcdef.'+(i+1)+'.'+n+'.'+code.slice(i*380,(i+1)*380);
-   await client.client._test.receiveQr(txt);
-  }
+ async function scan(client,pages){
+  for(const page of pages)await client.client._test.receiveQr(page);
  }
- await scan(guest,offer);
+ await scan(guest,pages);
+ assert.equal(guest.element('wifiScanProgress').value,pages.length,
+  'Scanning phone must display captured QR count');
+ assert.equal(guest.element('wifiScanProgress').max,pages.length,
+  'Scanning phone must know total QR count');
  const answer=guest.element('wifiPairingText').value;
  assert(answer&&answer.length>20,'Guest must generate an answer');
  assert(guest.element('wifiStatus').textContent.includes('Player 1’s camera'),
   'Guest must be instructed to show the answer QR to Player 1');
  assert.equal(guest.element('wifiStart').hidden,true,
   'Guest must not see a Play button until Player 1 scans the answer');
- await scan(host,answer);
+ await scan(host,guest.client._test.qrPages);
  assert(host.element('wifiStep').textContent.includes('connecting'),
   'Host must say the answer is scanned and the LAN connection is in progress');
  assert.equal(clients.length,2,'Pairing should create exactly two LAN peers');
