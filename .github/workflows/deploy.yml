@@ -49,6 +49,7 @@ jobs:
           node tests/android-immersive-fullscreen-regression.cjs
           node tests/local-wifi-protocol-regression.cjs
           node tests/local-human-game-regression.cjs
+          node tests/local-rematch-regression.cjs
           node tests/local-guest-perspective-regression.cjs
           node tests/iphone-top-controls-regression.cjs
           node tests/player-name-regression.cjs
