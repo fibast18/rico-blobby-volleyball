@@ -2000,7 +2000,11 @@ async function checkForUpdates(){
   if(typeof latest.version!=='string'||latest.version===APP_VERSION)return;
   pendingVersion=latest.version;
   if('serviceWorker'in navigator){const registration=await navigator.serviceWorker.getRegistration();if(registration)await registration.update()}
-  if(!running||!$('overlay').hidden){applyPendingUpdate()}else{
+  // Keep WebRTC intact even while the game-over overlay is showing:
+  // a background PWA update must NEVER force the phones to scan QR again.
+  if(LocalWifi.connected){
+   $('status').textContent='Update ready';
+  }else if(!running||!$('overlay').hidden){applyPendingUpdate()}else{
    $('status').textContent='Update ready';
   }
  }catch{}finally{checkingUpdate=false}
