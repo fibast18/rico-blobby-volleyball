@@ -445,6 +445,11 @@ body.fullscreen #stage .hud .left-hud,body.fullscreen #stage .hud .buttons{max-w
  body.fullscreen #stage .hud button.mini,body.fullscreen #stage .hud button.clock{
   font-size:11px!important;padding:0 5px!important}
 }
+@media(orientation:portrait) and (max-width:650px){
+ .wifi-dialog.presenting,.wifi-dialog:not(.scanning){grid-template-columns:1fr}
+ .wifi-dialog .wifi-qr,.wifi-dialog .wifi-code-actions{grid-column:1;grid-row:auto}
+ .wifi-dialog .wifi-qr svg{width:min(100%,40dvh,330px)}
+}
 </style></head><body class="fullscreen"><main>
 <div id="stage" class="stage"><canvas id="game" width="800" height="500" aria-label="Red and blue blobs playing volleyball on a beach"></canvas>
 <div class="hud">
