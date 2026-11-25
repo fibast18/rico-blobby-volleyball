@@ -428,7 +428,7 @@ body.fullscreen #stage .hud button:is(:active,.tapping){
  background:#eaf5ff;color:#1b3347;border-radius:7px;padding:5px;resize:vertical}
 .wifi-text-fallback button{margin:4px 0}
 body.fullscreen #stage .hud .left-hud,body.fullscreen #stage .hud .buttons{max-width:48%}
-#playerNameButton.blue-local{left:89%!important}
+#playerNameButton.blue-local{left:11%!important}
 @media(max-width:590px),(max-height:380px){
  .wifi-dialog{padding:8px;gap:5px}
  .wifi-dialog:not(.scanning):not(.presenting){grid-template-columns:minmax(0,1fr) minmax(150px,38%)}
@@ -509,7 +509,7 @@ body.fullscreen #stage .hud .left-hud,body.fullscreen #stage .hud .buttons{max-w
  </section>
 </div>
 <div id="settingsPanel" class="settings-panel" role="dialog" aria-modal="true" aria-label="Game settings" hidden><div class="settings-dialog">
-<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.8.2</small></p>
+<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.8.3</small></p>
 <label class="settings-field">Difficulty<select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><p class="difficulty-note" id="difficultyDescription">Normal • balanced speed, timing and aim</p>
 <button id="sound" class="settings-action" type="button">🔊 Sound on</button>
 <button id="resetLearning" class="settings-action" type="button">🧠 Reset Blue AI</button><button id="wifiSettingsButton" class="settings-action" type="button">📶 Local Wi-Fi Multiplayer</button>
@@ -583,8 +583,11 @@ function updateMovementTarget(clientX,clientY){
  const length=rotated?rect.height:rect.width;
  const fraction=clamp(position/(length*.5),0,1);
  // Map the left 50% of the physical touchscreen to the legal Red court.
+ // Both devices use the same intuitive local-left slider. Blue is
+ // physically on the host's right, so mirror the touch position when
+ // translating Player 2's local view into authoritative host coordinates.
  slideTargetX=localMode==='guest'?
-   (netX+netHalf+blue.r)+fraction*(W-netX-netHalf-2*blue.r):
+   (W-blue.r)-fraction*(W-netX-netHalf-2*blue.r):
    red.r+fraction*(netX-netHalf-2*red.r);
  const slider=$('movementPad');
  slider.setAttribute('aria-valuenow',String(Math.round(fraction*100)));
@@ -593,7 +596,7 @@ function updateMovementVisual(){
  const thumb=$('slideThumb');
  if(!thumb)return;
  const fraction=localMode==='guest'?
-   clamp((blue.x-netX-netHalf-blue.r)/(W-netX-netHalf-2*blue.r),0,1):
+   1-clamp((blue.x-netX-netHalf-blue.r)/(W-netX-netHalf-2*blue.r),0,1):
    clamp((red.x-red.r)/(netX-netHalf-2*red.r),0,1);
  thumb.style.left=(fraction*100)+'%';
  if(slidePointerId===null)
@@ -1425,6 +1428,14 @@ function drawBall(){
 }
 function draw(){
  if(backdrop.width!==canvas.width||backdrop.height!==H)renderBackdrop();
+ // Draw the identical host-authoritative world from Player 2's side:
+ // Blue appears LEFT and Red RIGHT on the guest device. Only the visual
+ // view flips; ball/score physics and network positions never change.
+ ctx.save();
+ if(localMode==='guest'){
+  ctx.translate(W,0);
+  ctx.scale(-1,1);
+ }
  ctx.drawImage(backdrop,0,0);
  const post=ctx.createLinearGradient(netX-9,0,netX+11,0);
  post.addColorStop(0,'#858f95');post.addColorStop(.3,'#f9fafb');post.addColorStop(.65,'#bec7cc');post.addColorStop(1,'#626d71');
@@ -1442,9 +1453,11 @@ function draw(){
  shad.addColorStop(0,'#33332b75');shad.addColorStop(1,'#33332b00');
  ctx.fillStyle=shad;ctx.beginPath();ctx.ellipse(ball.x,ground+9,Math.max(12,ball.r*1.5-(ground-ball.y)*.045),8,0,0,7);ctx.fill();
  drawBall();
+ ctx.restore(); // Player names, score and BALL text stay readable, never mirrored.
  if(ball.y<ball.r+8){
   // Locate the ball while it is above the visible sky.
-  const x=Math.max(26,Math.min(W-26,ball.x)),y=125;
+  const visibleBallX=localMode==='guest'?W-ball.x:ball.x;
+  const x=Math.max(26,Math.min(W-26,visibleBallX)),y=125;
   ctx.save();ctx.shadowColor='#102d4bb0';ctx.shadowBlur=8;
   ctx.fillStyle='#ffe067';ctx.strokeStyle='#5e4314';ctx.lineWidth=2;
   ctx.beginPath();ctx.moveTo(x,y-23);ctx.lineTo(x-16,y-4);ctx.lineTo(x-6,y-4);ctx.lineTo(x-6,y+13);ctx.lineTo(x+6,y+13);ctx.lineTo(x+6,y-4);ctx.lineTo(x+16,y-4);ctx.closePath();
@@ -1455,12 +1468,12 @@ function draw(){
  ctx.textAlign='center';ctx.font='bold 19px system-ui';ctx.lineWidth=3;
  ctx.strokeStyle='#1d3545bb';ctx.fillStyle='#fff';
  const otherLabel=localMode==='ai'?'OPPONENT':peerName.toUpperCase().slice(0,18);
- if(localMode==='guest'){
-  ctx.strokeText(otherLabel,W*.11,82);ctx.fillText(otherLabel,W*.11,82);
- }else{
-  ctx.strokeText(otherLabel,W*.89,82);ctx.fillText(otherLabel,W*.89,82);
- }
- ctx.font='bold 32px system-ui';ctx.strokeText(red.score+' : '+blue.score,netX,47);ctx.fillText(red.score+' : '+blue.score,netX,47);
+ ctx.strokeText(otherLabel,W*.89,82);ctx.fillText(otherLabel,W*.89,82);
+ // On each phone the LEFT score always belongs to its own Blobby.
+ const displayedScore=localMode==='guest'?
+   blue.score+' : '+red.score:red.score+' : '+blue.score;
+ ctx.font='bold 32px system-ui';
+ ctx.strokeText(displayedScore,netX,47);ctx.fillText(displayedScore,netX,47);
 }
 // iOS Home Screen PWAs sometimes report 100dvh shorter than the actual
 // physical landscape screen at initial launch. Measure the standalone
@@ -1798,7 +1811,7 @@ function localWifiMessage(data){
    playRefereeWhistle('end');
    running=false;paused=false;
    $('title').textContent=red.score>=15?'Red wins! 🎉':'Blue wins!';
-   $('detail').textContent='Final score '+red.score+' : '+blue.score;
+   $('detail').textContent='Final score '+blue.score+' : '+red.score;
    $('start').textContent='▶ Play vs AI';
    $('overlay').hidden=false;$('status').textContent='Finished';
    matchMs=0;pointMs=0;updateTimers();
