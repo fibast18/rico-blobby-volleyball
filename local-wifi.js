@@ -56,6 +56,7 @@
  function resetQr(){
   if(cycle){clearInterval(cycle);cycle=null}
   qrPages=[];page=0;qrHeld=false;$('wifiQr').replaceChildren();
+  $('wifiDialog').classList.toggle('presenting',false);
   setVisible('wifiQr',false);setVisible('wifiCodeActions',false);
  }
  function drawQr(){
@@ -85,6 +86,7 @@
   setVisible('wifiCodeActions',true);
   $('wifiPairingText').value=code;
   $('wifiDialog').classList.toggle('scanning',false);
+  $('wifiDialog').classList.toggle('presenting',true);
   // Keep each QR stable long enough for focus, exposure, and decoding.
   // The presenter can hold one page or navigate manually if needed.
   if(qrPages.length>1)cycle=setInterval(()=>{
@@ -244,6 +246,7 @@
   setVisible('wifiCamera',false);
   setVisible('wifiScanFeedback',false);
   $('wifiDialog').classList.toggle('scanning',false);
+  $('wifiDialog').classList.toggle('presenting',qrPages.length>0);
   setVisible('wifiQr',qrPages.length>0);
   setVisible('wifiCodeActions',qrPages.length>0);
  }
@@ -257,6 +260,7 @@
   setVisible('wifiQr',false);setVisible('wifiCodeActions',false);
   setVisible('wifiCamera',true);setVisible('wifiScanFeedback',true);
   $('wifiDialog').classList.toggle('scanning',true);
+  $('wifiDialog').classList.toggle('presenting',false);
   setScanProgress(0);
   setStep(role==='host'?
    'Step 3 of 3 — Scan Player 2’s answer QR':
