@@ -598,7 +598,7 @@ function updateMovementVisual(){
  const fraction=localMode==='guest'?
    1-clamp((blue.x-netX-netHalf-blue.r)/(W-netX-netHalf-2*blue.r),0,1):
    clamp((red.x-red.r)/(netX-netHalf-2*red.r),0,1);
- thumb.style.left=(fraction*100)+'%';
+ thumb.style.left=(Math.round(fraction*1000)/10)+'%';
  if(slidePointerId===null)
    $('movementPad').setAttribute('aria-valuenow',String(Math.round(fraction*100)));
 }
