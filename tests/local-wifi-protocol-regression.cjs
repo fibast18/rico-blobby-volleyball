@@ -8,8 +8,13 @@ assert(source.includes('iceServers:[]'),'The connection must use Wi-Fi only (no 
 assert(!/stun:|turn:|navigator\.bluetooth|new WebSocket|fetch\(/i.test(source),
  'Offline multiplayer may not depend on internet, Bluetooth, or cloud signaling');
 assert(html.includes('id="wifiCreate"')&&html.includes('id="wifiJoin"')&&
- html.includes('id="wifiScan"')&&html.includes('id="wifiStart"'),
- 'A local host, guest, QR scanner and Start flow must exist');
+ html.includes('id="wifiScan"')&&html.includes('id="wifiStart"')&&
+ html.includes('id="wifiStep"'),
+ 'A local host, guest, visible step guide, QR scanner and Start flow must exist');
+assert(html.includes('.wifi-actions[hidden]'),
+ 'The previous Create/Join choices must be truly hidden after choosing a role');
+assert(html.includes("data.t==='start-request'&&LocalWifi.connected&&!running"),
+ 'Guest pressing Play must request an authoritative start on the host');
 assert(worker.includes('qr-scanner-worker.min.js'),'Offline scanner worker must be bundled');
 for(const asset of ['local-wifi.js','vendor/qrcode.js','vendor/qr-scanner.min.js','vendor/qr-scanner-worker.min.js'])
  assert(sw.includes("'./"+asset+"'"),'Offline PWA cache must include '+asset);
@@ -81,7 +86,12 @@ async function run(){
  await host.element('wifiCreate').fire('click');
  const offer=host.element('wifiPairingText').value;
  assert(offer&&offer.length>20,'Host must display a local offer: '+host.element('wifiStatus').textContent);
+ assert.equal(host.element('wifiStartNew').hidden,true,'Host must hide initial Create/Join buttons after room creation');
+ assert.equal(host.element('wifiScan').hidden,false,'Host must display Scan Player 2 Answer QR');
+ assert(host.element('wifiStep').textContent.includes('Step 2'),'Host must explain the QR exchange');
  await guest.element('wifiJoin').fire('click');
+ assert.equal(guest.element('wifiStartNew').hidden,true,'Guest must hide initial Create/Join buttons');
+ assert.equal(guest.element('wifiStart').hidden,true,'Guest Play must not appear before connection');
  async function scan(client,code){
   const n=Math.ceil(code.length/380);
   for(let i=0;i<n;i++){
@@ -92,7 +102,13 @@ async function run(){
  await scan(guest,offer);
  const answer=guest.element('wifiPairingText').value;
  assert(answer&&answer.length>20,'Guest must generate an answer');
+ assert(guest.element('wifiStatus').textContent.includes('Player 1’s camera'),
+  'Guest must be instructed to show the answer QR to Player 1');
+ assert.equal(guest.element('wifiStart').hidden,true,
+  'Guest must not see a Play button until Player 1 scans the answer');
  await scan(host,answer);
+ assert(host.element('wifiStep').textContent.includes('connecting'),
+  'Host must say the answer is scanned and the LAN connection is in progress');
  assert.equal(clients.length,2,'Pairing should create exactly two LAN peers');
  assert(clients[0].remoteDescription?.type==='answer','Host must import guest answer');
  assert(clients[1].remoteDescription?.type==='offer','Guest must import host offer');
@@ -102,8 +118,21 @@ async function run(){
  g.onopen();h.onopen();
  assert.deepEqual(host.events.connected,['host']);
  assert.deepEqual(guest.events.connected,['guest']);
+ assert.equal(host.element('wifiStart').hidden,false,
+  'Host Play Now appears after local data channel opens');
+ assert.equal(guest.element('wifiStart').hidden,false,
+  'Guest Play Now also appears after local data channel opens');
+ assert.equal(host.element('wifiStartNew').hidden,true);
+ assert.equal(guest.element('wifiStartNew').hidden,true);
+ assert(host.element('wifiStep').textContent.includes('Connected'));
+ assert(guest.element('wifiStep').textContent.includes('Connected'));
  guest.client.send({t:'input',x:.7,jump:true});
  assert.equal(host.events.received.at(-1).jump,true,'Blue controls must reach host over local link');
+ await guest.element('wifiStart').fire('click');
+ assert.equal(host.events.received.at(-1).t,'start-request',
+  'Blue can request the match to start when both phones are connected');
+ assert.equal(guest.element('wifiStart').hidden,true,
+  'Guest Play button must be disabled immediately to avoid double start');
  await host.element('wifiStart').fire('click');
  assert.equal(host.events.started,1,'Host controls start of match');
  assert.equal(guest.events.received.at(-1).t,'start','Guest must be told to start');
