@@ -13,7 +13,7 @@ function simulateServe(mode='normal',width=800){
  const red={x:width*.245,y:430,vx:0,vy:0,r:49.45,jelly:0,jellyV:0,movePhase:0,hitCooldown:0,score:0};
  const blue={x:(courtNet+width)*.5,y:430,vx:0,vy:0,r:49.45,jelly:0,jellyV:0,movePhase:0,hitCooldown:0,score:1};
  const ball={x:blue.x,y:260,vx:0,vy:0,r:36};
- const s={W:width,netX:courtNet,netHalf:7,netTop:262,ground:430,red,blue,ball,
+ const s={localMode:'ai',W:width,netX:courtNet,netHalf:7,netTop:262,ground:430,red,blue,ball,
   frame:0,rallyTicks:0,touchLock:0,pressed:{jump:false},slideTargetX:null,
   awaitServe:true,server:'blue',serveDelay:0,
   cpuJumpCooldown:0,cpuJumpArmed:true,cpuJumpPlan:null,
