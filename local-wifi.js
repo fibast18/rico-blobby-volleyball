@@ -208,6 +208,8 @@
  async function stopScan(){
   if(scanner){const old=scanner;scanner=null;try{old.stop();old.destroy()}catch{}}
   setVisible('wifiCamera',false);
+  setVisible('wifiQr',qrPages.length>0);
+  setVisible('wifiCodeActions',qrPages.length>0);
  }
  async function startScan(){
   if(busy)return;
@@ -215,6 +217,8 @@
    setStatus('Camera access is unavailable. Use the pairing-text field instead.');return;
   }
   fragments.clear();stopScan();
+  if(cycle){clearInterval(cycle);cycle=null}
+  setVisible('wifiQr',false);setVisible('wifiCodeActions',false);
   setVisible('wifiCamera',true);
   setStatus('Point your camera at the other phone. Scan all rotating QR pages.');
   try{
