@@ -916,7 +916,7 @@ function finish(){
  const finalScore=red.score+' : '+blue.score;
  $('title').textContent=red.score>=15?'Red wins! 🎉':'Blue wins!';
  $('detail').textContent='Final score '+finalScore;
- $('start').textContent='↻ Play Again';
+ $('start').textContent=localMode==='host'?'▶ Play vs AI':'↻ Play Again';
  $('overlay').hidden=false;
  $('status').textContent='Finished';
  $('pauseBtn').textContent='⏸ Pause';
@@ -1562,7 +1562,10 @@ stage.addEventListener('touchmove',e=>{if(e.target.closest('[data-control]'))e.p
 window.addEventListener('blur',pauseOnExit);
 window.addEventListener('pagehide',pauseOnExit);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)pauseOnExit()});
-$('start').onclick=()=>{wakeAudio();requestLandscapeOrientation();begin()};
+$('start').onclick=()=>{
+ if(LocalWifi.active){LocalWifi.leave();localMode='ai';updatePeerLabel()}
+ wakeAudio();requestLandscapeOrientation();begin();
+};
 // iOS can delay or lose the synthesized click over a touch-action:none
 // game court. Handle a finger's pointerup immediately and suppress its
 // subsequent synthetic click, while retaining keyboard/mouse activation.
