@@ -65,7 +65,7 @@
   if(total>75)throw Error('Pairing code is too large');
   qrPages=Array.from({length:total},(_,i)=>
    'BV1.'+token+'.'+(i+1)+'.'+total+'.'+code.slice(i*chunkSize,(i+1)*chunkSize));
-  page=0;drawQr();setVisible('wifiCodeActions',true);
+  page=0;setVisible('wifiQr',true);drawQr();setVisible('wifiCodeActions',true);
   $('wifiPairingText').value=code;
   // Rotate pages automatically, so the other phone can scan every frame.
   if(qrPages.length>1)cycle=setInterval(()=>{if($('wifiPanel').hidden)return;
