@@ -12,6 +12,11 @@ const section=(a,b)=>{
 const modal=html.slice(html.indexOf('<div id="overlay"'),html.indexOf('<div id="playerNamePanel"'));
 assert(modal.includes('id="wifiRematch"')&&modal.includes('hidden'),
  'Replay button must exist on the game-over panel, initially hidden');
+assert(modal.includes('id="finalMatchTime" class="final-match-time" hidden'),
+ 'Completed match duration must sit below final score and be hidden before a match');
+assert(modal.indexOf('id="detail"')<modal.indexOf('id="finalMatchTime"')&&
+ modal.indexOf('id="finalMatchTime"')<modal.indexOf('id="wifiRematch"'),
+ 'Match time must display immediately below the final score and above replay');
 assert(modal.indexOf('id="wifiRematch"')<modal.indexOf('id="start"'),
  'Play Again must appear before Leave Wi-Fi so players do not disconnect by mistake');
 assert(html.includes("Leave Wi-Fi • Play vs AI"),
@@ -28,7 +33,8 @@ assert(html.includes("setLocalRematchAvailable(LocalWifi.connected)"),
 assert(html.includes("data.t==='rematch-request'")&&html.includes("data.t==='rematch-start'"),
  'Replay needs guest request and host authoritative start messages');
 
-const core=section('function setLocalRematchAvailable(available){','function score(side){');
+const clock=section('function clockText(ms){','function updateTimers(){');
+const core=section('function showFinalMatchTime(durationMs){','function score(side){');
 const peer=section('function localPaddleFraction(){','LocalWifi.attach({');
 function createPeer(role){
  const ids=new Map();
@@ -68,6 +74,7 @@ function createPeer(role){
   document:{hidden:false}
  };
  vm.createContext(ctx);
+ vm.runInContext(clock,ctx,{timeout:1000});
  vm.runInContext(core,ctx,{timeout:1000});
  vm.runInContext(peer,ctx,{timeout:1000});
  return {ctx,ids,element,sent,history,calls};
@@ -95,6 +102,9 @@ for(const p of [host,guest]){
  assert.match(p.element('wifiRematch').textContent,/Play Again/);
  assert.equal(p.element('overlay').hidden,false,'Final score panel remains visible');
  assert.equal(p.history.length,1,'Completed first match must be recorded once');
+ assert.equal(p.element('finalMatchTime').hidden,false,'Both phones must show match duration');
+ assert.equal(p.element('finalMatchTime').textContent,'Match time: 02:03',
+  'Both phones must display the identical completed duration underneath the score');
 }
 assert.equal(host.history[0].red,15);
 assert.equal(guest.history[0].blue,10);
@@ -112,6 +122,7 @@ assert.equal(host.ctx.red.score,0);assert.equal(host.ctx.blue.score,0);
 assert.equal(host.ctx.matchMs,0);assert.equal(host.ctx.pointMs,0);
 assert.equal(host.ctx.awaitServe,true);
 assert.equal(host.element('wifiRematch').hidden,true);
+assert.equal(host.element('finalMatchTime').hidden,true,'Rematch clears previous time from overlay');
 assert.equal(host.element('overlay').hidden,true);
 assert.equal(host.ctx.remoteInput.jump,false,'Old guest Jump state must not bleed into rematch');
 assert.equal(host.ctx.remoteInput.x,.5,'New match starts with neutral remote movement');
@@ -123,6 +134,7 @@ assert.equal(guest.ctx.red.score,0);assert.equal(guest.ctx.blue.score,0);
 assert.equal(guest.ctx.matchMs,0);assert.equal(guest.ctx.pointMs,0);
 assert.equal(guest.ctx.awaitServe,true);
 assert.equal(guest.element('wifiRematch').hidden,true);
+assert.equal(guest.element('finalMatchTime').hidden,true,'Guest rematch clears previous match time');
 assert.equal(guest.element('overlay').hidden,true);
 assert.equal(host.ctx.LocalWifi.connected,true);
 assert.equal(guest.ctx.LocalWifi.connected,true);
@@ -145,12 +157,18 @@ vm.runInContext('finish()',host.ctx);
 deliver(host,guest);
 assert.equal(host.history.length,2);
 assert.equal(guest.history.length,2);
+assert.equal(host.element('finalMatchTime').textContent,'Match time: 01:28',
+ 'Host duration must show the second match, not the first one');
+assert.equal(guest.element('finalMatchTime').textContent,'Match time: 01:28',
+ 'Guest duration must match host for the second match');
 vm.runInContext('requestLocalRematch()',host.ctx);
 assert.equal(host.ctx.running,true);
 assert.deepEqual(deliver(host,guest).map(m=>m.t),['rematch-start','state']);
 assert.equal(guest.ctx.running,true);
 assert.equal(host.ctx.LocalWifi.connected,true);
 assert.equal(guest.ctx.LocalWifi.connected,true);
+assert.equal(host.element('finalMatchTime').hidden,true);
+assert.equal(guest.element('finalMatchTime').hidden,true);
 assert.equal(host.history.length,2,'Starting next game must not erase history');
 assert.equal(guest.history.length,2);
 
@@ -160,4 +178,14 @@ host.ctx.LocalWifi.connected=false;
 vm.runInContext('setLocalRematchAvailable(false);requestLocalRematch()',host.ctx);
 assert.equal(host.element('wifiRematch').hidden,true);
 assert.equal(host.sent.length,0);
-console.log('Two finished Wi-Fi matches, replay from either phone, new scores/timers, retained history and no QR reconnection passed.');
+// Verify AI mode uses the identical final-score duration display.
+const ai=createPeer('ai');
+vm.runInContext('finish()',ai.ctx);
+assert.equal(ai.element('finalMatchTime').textContent,'Match time: 02:03',
+ 'Single-player final score must also show completed match time');
+assert.equal(ai.element('finalMatchTime').hidden,false);
+assert.equal(ai.element('detail').textContent,'Final score 15 : 10');
+assert.equal(ai.element('wifiRematch').hidden,true,
+ 'AI finish must not offer Wi-Fi replay');
+assert.equal(ai.ctx.matchMs,0,'HUD timer resets but final match duration remains visible');
+console.log('AI and two-phone match time, consecutive rematches, retained history and no QR reconnection passed.');
