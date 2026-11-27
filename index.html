@@ -1103,6 +1103,21 @@ function showFinalMatchTime(durationMs){
  label.textContent='Match time: '+clockText(durationMs);
  label.hidden=false;
 }
+// The AI's actual difficulty setting is read by tick() every frame.
+// The screenshot label reads that same setting, not a separate default.
+// Local human-vs-human Wi-Fi matches have no Easy/Normal/Hard AI opponent.
+function currentMatchLevelLabel(){
+ if(localMode!=='ai')return 'Mode: Wi-Fi • 2 Players';
+ const levels={easy:'Easy',normal:'Normal',hard:'Hard'};
+ return 'Difficulty: '+(levels[$('difficulty').value]||'Normal');
+}
+function updateMatchLevelBadge(){
+ $('difficultyHud').textContent=currentMatchLevelLabel();
+}
+function showFinalMatchLevel(){
+ $('finalDifficulty').textContent=currentMatchLevelLabel();
+ $('finalDifficulty').hidden=false;
+}
 // Pause opens an actual pause menu, not an instantly destructive Restart.
 let pendingDiscardAction=null;
 function openPauseMenu(){
@@ -1143,7 +1158,9 @@ function discardActiveMatch(){
  $('overlay').hidden=false;
  $('resumeMatch').hidden=true;
  $('finalMatchTime').hidden=true;
+ $('finalDifficulty').hidden=true;
  setLocalRematchAvailable(false);
+ updateMatchLevelBadge();
  $('title').textContent='Ready to play?';
  $('detail').textContent='First to 15 points.';
  $('start').textContent='▶ Play vs AI';
@@ -1217,10 +1234,12 @@ function begin(){
  $('discardPanel').hidden=true;
  firstServeCompleted=false;
  $('finalMatchTime').hidden=true;
+ $('finalDifficulty').hidden=true;
  $('resumeMatch').hidden=true;
  setLocalRematchAvailable(false);
  matchMs=0;pointMs=0;matchStarted=false;paused=false;
  serveReset('red');running=true;
+ updateMatchLevelBadge();
  updateControlGuide();
  $('overlay').hidden=true;$('settingsPanel').hidden=true;
  $('pauseBtn').textContent='⏸ Pause';
@@ -1248,6 +1267,7 @@ function finish(){
  $('detail').textContent='Final score '+finalScore;
  $('resumeMatch').hidden=true;
  showFinalMatchTime(matchMs);
+ showFinalMatchLevel();
  $('start').textContent=localMode==='ai'?'↻ Play Again':'Leave Wi-Fi • Play vs AI';
  setLocalRematchAvailable(localMode==='host'&&LocalWifi.connected);
  $('overlay').hidden=false;
@@ -2039,8 +2059,12 @@ const updateDifficultyDescription=()=>{
  };
  $('difficultyDescription').textContent=descriptions[$('difficulty').value]||descriptions.normal;
 };
-$('difficulty').addEventListener('change',updateDifficultyDescription);
+$('difficulty').addEventListener('change',()=>{
+ updateDifficultyDescription();
+ updateMatchLevelBadge();
+});
 updateDifficultyDescription();
+updateMatchLevelBadge();
 $('sound').onclick=()=>{sound=!sound;$('sound').textContent=sound?'🔊 Sound on':'🔇 Sound off'};
 $('controlGuideSetting').onclick=()=>{guidePinned=!guidePinned;updateControlGuide()};
 $('resetLearning').onclick=()=>{
@@ -2094,9 +2118,11 @@ function beginGuestMatch(){
  setLocalRematchAvailable(false);
  $('resumeMatch').hidden=true;
  $('finalMatchTime').hidden=true;
+ $('finalDifficulty').hidden=true;
  red.score=0;blue.score=0;
  matchMs=0;pointMs=0;matchStarted=false;
  paused=false;running=true;awaitServe=true;
+ updateMatchLevelBadge();
  updateControlGuide();
  $('overlay').hidden=true;$('settingsPanel').hidden=true;
  $('pauseBtn').textContent='⏸ Pause';
@@ -2200,6 +2226,7 @@ function localWifiMessage(data){
    $('detail').textContent='Final score '+blue.score+' : '+red.score;
    $('resumeMatch').hidden=true;
    showFinalMatchTime(matchMs);
+   showFinalMatchLevel();
    $('start').textContent='Leave Wi-Fi • Play vs AI';
    setLocalRematchAvailable(LocalWifi.connected);
    $('overlay').hidden=false;$('status').textContent='Finished';
@@ -2212,6 +2239,7 @@ LocalWifi.attach({
   localMode=role;localSnapshotId=0;peerName='OPPONENT';
   setLocalRematchAvailable(false);
   remoteInput={x:.5,jump:false};clearInput();updatePeerLabel();
+  updateMatchLevelBadge();
   LocalWifi.send({t:'hello',name:playerName});
  },
  onMessage:localWifiMessage,
@@ -2230,6 +2258,8 @@ LocalWifi.attach({
    $('detail').textContent='Reconnect using Local Wi-Fi, or play against Blue AI.';
    $('resumeMatch').hidden=true;
    $('finalMatchTime').hidden=true;
+   $('finalDifficulty').hidden=true;
+   updateMatchLevelBadge();
    $('start').textContent='▶ Play vs AI';
    $('overlay').hidden=false;$('status').textContent='Ready';
   }
