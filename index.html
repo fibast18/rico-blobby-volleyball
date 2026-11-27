@@ -551,12 +551,13 @@ html:fullscreen body,html:-webkit-full-screen body{
    top-left match HUD. Screen-reader status messages stay accessible. */
 #stage .hud #difficultyHud{position:relative;top:auto;right:auto;
  display:inline-flex;align-items:center;justify-content:center;
- pointer-events:none!important;margin:0;min-width:50px;
- color:#fff;background:rgba(4,49,78,.58)!important;
- border:1px solid rgba(255,255,255,.27)!important;
- border-radius:8px!important;padding:4px 8px!important;
+ pointer-events:none!important;margin:0;min-width:0;
+ color:#fff;background:transparent!important;background-color:transparent!important;
+ border:0!important;box-shadow:none!important;
+ border-radius:0!important;padding:0!important;
  font:750 clamp(12px,1.8vw,16px)/1.2 system-ui!important;
- text-shadow:0 1px 2px #00334e!important;white-space:nowrap}
+ text-shadow:0 1px 3px rgba(0,24,42,.95),0 0 6px rgba(0,26,46,.78)!important;
+ white-space:nowrap}
 #stage .hud .hud-announcement{position:absolute!important;
  width:1px!important;height:1px!important;overflow:hidden!important;
  clip-path:inset(50%)!important;white-space:nowrap!important}
@@ -649,7 +650,7 @@ html:fullscreen body,html:-webkit-full-screen body{
  </section>
 </div>
 <div id="settingsPanel" class="settings-panel" role="dialog" aria-modal="true" aria-label="Game settings" hidden><div class="settings-dialog">
-<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.9.2</small></p>
+<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.9.3</small></p>
 <label class="settings-field">Difficulty<select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><p class="difficulty-note" id="difficultyDescription">Normal • balanced speed, timing and aim</p>
 <button id="sound" class="settings-action" type="button">🔊 Sound on</button><button id="controlGuideSetting" class="settings-action" type="button">👆 Show controls guide</button>
 <button id="resetLearning" class="settings-action" type="button">🧠 Reset Blue AI</button>
@@ -1091,7 +1092,7 @@ function pauseOnExit(){
 function serveReset(side='red'){
  server=side;cpuAttempt=null;cpuHadTouch=false;lastVolleySide=null;consecutiveTouches=0;touchFault=null;
  red.x=W*.245;red.y=ground;red.vx=0;red.vy=0;red.jelly=0;red.jellyV=0;red.movePhase=0;red.hitCooldown=0;
- blue.x=(netX+W)*.5;blue.aiAim=blue.x;blue.aiDelay=0;blue.cpuSpeed=6.7;blue.y=ground;blue.vx=0;blue.vy=0;blue.jelly=0;blue.jellyV=0;blue.movePhase=0;blue.hitCooldown=0;
+ blue.x=(netX+W)*.5;blue.aiAim=blue.x;blue.aiMoveTarget=blue.x;blue.aiSmoothRate=.5;blue.aiDelay=0;blue.cpuSpeed=6.7;blue.y=ground;blue.vx=0;blue.vy=0;blue.jelly=0;blue.jellyV=0;blue.movePhase=0;blue.hitCooldown=0;
  ball.x=side==='red'?red.x:blue.x;
  ball.y=ground-170;ball.vx=0;ball.vy=0;awaitServe=true;pointMs=0;scoreTimer=0;serveDelay=0;rallyTicks=0;lastTouch=null;touchLock=0;cpuJumpCooldown=0;cpuJumpArmed=true;cpuJumpPlan=null;clearInput();
  $('message').textContent=side==='red'?'Jump to serve from your court':'Blue serves next';
@@ -1287,6 +1288,20 @@ function move(p,dir,jump,dt){
  if(p===red&&slideTargetX!==null){
   const maxSpeed=9.6*(W/800);
   p.vx=clamp((slideTargetX-p.x)/Math.max(dt,.15),-maxSpeed,maxSpeed);
+ }else if(p===blue&&localMode==='ai'){
+  // Previously Blue ran at full speed to either side of a target and
+  // reversed instantly each frame. In Hard this caused visible shaking.
+  // Smooth velocity, brake as we approach, and never cross a close target.
+  const maxSpeed=(p.cpuSpeed??7.8)*(W/800);
+  const target=Number.isFinite(p.aiMoveTarget)?p.aiMoveTarget:p.x;
+  const distance=target-p.x;
+  const desired=clamp(distance*.52,-maxSpeed,maxSpeed);
+  const blend=clamp((p.aiSmoothRate??.5)*dt,0,1);
+  p.vx=(Number.isFinite(p.vx)?p.vx:0)+(desired-(Number.isFinite(p.vx)?p.vx:0))*blend;
+  if(Math.abs(distance)<1.5&&Math.abs(p.vx)<1.4)p.vx=0;
+  // Clamp the final small correction to avoid repeated left-right bounces.
+  if(distance*p.vx>0&&Math.abs(p.vx*dt)>Math.abs(distance))
+   p.vx=distance/Math.max(dt,.01);
  }else p.vx=dir*(p===blue?(p.cpuSpeed??7.8):6.6)*(W/800);
  p.x+=p.vx*dt;
  p.hitCooldown=Math.max(0,p.hitCooldown-dt);
@@ -1567,6 +1582,13 @@ function tick(dt){
   }
   aim=blue.aiAim;
  }
+ // Gradually steer toward each newly forecast landing position instead of
+ // snapping to every prediction. Hard still reacts sooner and runs faster;
+ // Easy and Normal receive the same natural acceleration and braking.
+ const targetBlend=clamp(dt*(difficulty==='hard'?.65:difficulty==='normal'?.49:.37),0,1);
+ if(!Number.isFinite(blue.aiMoveTarget))blue.aiMoveTarget=blue.x;
+ blue.aiMoveTarget+= (clampBlue(aim)-blue.aiMoveTarget)*targetBlend;
+ blue.aiSmoothRate=difficulty==='hard'?.66:difficulty==='normal'?.54:.43;
  const tolerance=profile.tolerance;
  dir=aim>blue.x+tolerance?1:aim<blue.x-tolerance?-1:0;
  move(blue,dir,jump,dt);
