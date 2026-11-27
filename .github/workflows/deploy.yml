@@ -46,6 +46,9 @@ jobs:
           node tests/touch-slider-and-rally-regression.cjs
           node tests/mobile-hud-and-timers-regression.cjs
           node tests/in-game-menu-regression.cjs
+          node tests/first-serve-control-guide-regression.cjs
+          node tests/pause-and-discard-safety-regression.cjs
+          node tests/wifi-pairing-guidance-regression.cjs
           node tests/iphone-landscape-viewport-regression.cjs
           node tests/android-immersive-fullscreen-regression.cjs
           node tests/local-wifi-protocol-regression.cjs
