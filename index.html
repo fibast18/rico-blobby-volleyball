@@ -470,16 +470,27 @@ html:fullscreen body,html:-webkit-full-screen body{
 /* Completed match duration appears underneath the final score on both phones. */
 #finalMatchTime[hidden]{display:none!important}
 .dialog #finalMatchTime{margin:4px 0 10px;font-size:15px;font-weight:700;color:#e2f5ff;font-variant-numeric:tabular-nums}
+/* Settings belongs to the initial/final pop-up, not the in-game HUD. */
+.overlay .dialog #settingsButton{
+ display:block;margin:9px auto 0;width:min(100%,315px);
+ min-height:44px;padding:11px 17px;
+ border:1px solid rgba(255,255,255,.5);
+ background:transparent;color:#fff;
+ border-radius:12px;
+ font:700 clamp(14px,2vw,17px)/1.2 system-ui;
+ touch-action:manipulation;
+}
+.overlay .dialog #settingsButton:active{opacity:.72}
 </style></head><body class="fullscreen"><main>
 <div id="stage" class="stage"><canvas id="game" width="800" height="500" aria-label="Red and blue blobs playing volleyball on a beach"></canvas>
 <div class="hud">
   <div class="left-hud"><span id="status" class="mini" aria-live="polite">Ready</span><button class="clock" id="matchTimer" type="button" aria-label="View match timer history" aria-haspopup="dialog">Match 00:00</button><button class="clock" id="pointTimer" type="button" aria-label="View point timer history" aria-haspopup="dialog">Point 00:00</button></div>
-  <div class="buttons"><button id="restart" class="mini" type="button">↻ Restart</button><button id="pauseBtn" class="mini" type="button">⏸ Pause</button><button id="settingsButton" class="mini settings-gear" type="button" aria-label="Settings" aria-haspopup="dialog" aria-expanded="false">⚙</button></div>
+  <div class="buttons"><button id="restart" class="mini" type="button">↻ Restart</button><button id="pauseBtn" class="mini" type="button">⏸ Pause</button></div>
 </div>
 <button id="playerNameButton" type="button" class="player-name-button" aria-label="Change your player name" aria-haspopup="dialog">PLAYER</button>
 <div id="message" class="message" hidden aria-live="polite"></div>
 <div class="controls" id="controls"><div class="control" id="movementPad" data-control="slide" role="slider" aria-label="Slide your finger left or right to move Red Blobby" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" tabindex="0"><span class="slide-track"><span class="slide-thumb" id="slideThumb"></span></span></div><button class="control" type="button" data-control="jump" aria-label="Jump anywhere on the right half of the court"></button></div>
-<div id="overlay" class="overlay"><div class="dialog"><h2 id="title">Ready to play?</h2><p id="detail">First to 15 points.</p><p id="finalMatchTime" class="final-match-time" hidden></p><button id="wifiRematch" type="button" hidden>↻ Play Again — Same Wi-Fi</button><button id="start" type="button">▶ Play vs AI</button><button id="wifiModeButton" type="button" class="wifi-mode-button">📶 Local Wi-Fi — 2 Players</button></div></div>
+<div id="overlay" class="overlay"><div class="dialog"><h2 id="title">Ready to play?</h2><p id="detail">First to 15 points.</p><p id="finalMatchTime" class="final-match-time" hidden></p><button id="wifiRematch" type="button" hidden>↻ Play Again — Same Wi-Fi</button><button id="start" type="button">▶ Play vs AI</button><button id="wifiModeButton" type="button" class="wifi-mode-button">📶 Local Wi-Fi — 2 Players</button><button id="settingsButton" class="opening-settings-button" type="button" aria-haspopup="dialog" aria-controls="settingsPanel" aria-expanded="false">⚙ Settings</button></div></div>
 </div>
 <div id="playerNamePanel" class="player-name-panel" role="dialog" aria-modal="true" aria-labelledby="playerNameTitle" hidden>
  <form id="playerNameForm" class="player-name-dialog">
@@ -529,7 +540,7 @@ html:fullscreen body,html:-webkit-full-screen body{
  </section>
 </div>
 <div id="settingsPanel" class="settings-panel" role="dialog" aria-modal="true" aria-label="Game settings" hidden><div class="settings-dialog">
-<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.8.6</small></p>
+<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.8.7</small></p>
 <label class="settings-field">Difficulty<select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><p class="difficulty-note" id="difficultyDescription">Normal • balanced speed, timing and aim</p>
 <button id="sound" class="settings-action" type="button">🔊 Sound on</button>
 <button id="resetLearning" class="settings-action" type="button">🧠 Reset Blue AI</button>
