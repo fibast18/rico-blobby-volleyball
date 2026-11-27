@@ -489,15 +489,91 @@ html:fullscreen body,html:-webkit-full-screen body{
  background:#ffdb66;color:#17374d;font:800 clamp(15px,2.2vw,18px) system-ui;
  touch-action:manipulation;
 }
+
+/* v2.9.0: show control hints while learning the first serve, then fade. */
+#serveGuide[hidden],#pausePanel[hidden],#discardPanel[hidden]{display:none!important}
+#serveGuide{position:absolute;z-index:5;left:50%;bottom:clamp(75px,22%,145px);
+ transform:translateX(-50%);width:max-content;max-width:90%;
+ border-radius:15px;padding:10px 16px;
+ background:rgba(6,54,86,.85);color:white;text-align:center;
+ font:700 clamp(12px,2.1vw,17px)/1.3 system-ui;
+ text-shadow:0 1px 3px #002b48;pointer-events:none;
+ transition:opacity .7s ease;opacity:1}
+#serveGuide.fading{opacity:0}
+#controls .slide-track,#controls .slide-thumb{transition:background .65s,box-shadow .65s,border-color .65s}
+#controls.guide-active .slide-track{background:rgba(255,232,107,.9)!important;height:6px}
+#controls.guide-active .slide-thumb{
+ background:#ffe471!important;border:2px solid #fff!important;
+ width:24px!important;height:24px!important;
+ box-shadow:0 0 12px #ffc829!important}
+#controls.guide-active [data-control=jump]{
+ background:rgba(255,232,107,.085)!important;
+ box-shadow:inset 0 0 0 2px rgba(255,237,146,.47)!important;
+}
+#controls.guide-active [data-control=jump]::after{
+ content:"↑ TAP TO JUMP";position:absolute;bottom:14px;right:13%;
+ font:800 clamp(11px,1.8vw,16px) system-ui;color:#fff9d2;
+ background:rgba(3,55,88,.77);border-radius:10px;padding:8px 12px;
+ text-shadow:0 1px 2px #093344;pointer-events:none;
+}
+.game-action-panel{position:absolute;inset:0;z-index:12;
+ background:rgba(0,31,53,.78);display:grid;place-items:center;
+ padding:16px;text-align:center;touch-action:auto!important}
+.game-action-dialog{width:min(385px,92%);max-height:90%;overflow:auto;
+ display:flex;flex-direction:column;gap:11px;padding:20px;
+ background:#073b62f5;border:1px solid #ffffff40;border-radius:18px;
+ box-shadow:0 12px 45px #00253f9e}
+.game-action-dialog h2{font-size:22px;margin:0}
+.game-action-dialog p{font-size:14px;margin:0 0 5px;line-height:1.4}
+.game-action-dialog button{
+ min-height:48px;border:0;border-radius:12px;padding:10px 15px;
+ background:#e6f3ff;color:#173c56;
+ font:750 clamp(14px,2vw,17px) system-ui;touch-action:manipulation}
+#pauseResume,#discardCancel{background:#ffdf72}
+#discardConfirm{background:#b82d36;color:white}
+.confirm-panel{z-index:15}
+.wifi-next-action[hidden],.wifi-error-help[hidden],
+.wifi-error-help button[hidden]{display:none!important}
+.wifi-next-action{grid-column:1/-1;border-radius:10px;
+ padding:9px 12px;background:#135881;border:1px solid #ffdc817a;
+ display:flex;flex-direction:column;gap:3px}
+.wifi-next-action strong{font-size:clamp(16px,2.5vw,23px);color:#ffe17c}
+.wifi-next-action span{font-size:12px;line-height:1.3}
+.wifi-error-help{grid-column:1/-1;padding:10px;border-radius:10px;
+ background:#662a35;border:1px solid #ffc4b7;
+ display:flex;flex-direction:column;gap:8px;font-size:12px;line-height:1.45}
+.wifi-error-help button{min-height:45px;background:#ffdc79}
+.wifi-dialog.scanning .wifi-next-action{grid-column:1}
+@media(max-height:380px){.game-action-dialog{padding:10px;gap:6px}
+ .game-action-dialog h2{font-size:17px}
+ #serveGuide{padding:7px 10px}}
 </style></head><body class="fullscreen"><main>
 <div id="stage" class="stage"><canvas id="game" width="800" height="500" aria-label="Red and blue blobs playing volleyball on a beach"></canvas>
 <div class="hud">
   <div class="left-hud"><span id="status" class="mini" aria-live="polite">Ready</span><button class="clock" id="matchTimer" type="button" aria-label="View match timer history" aria-haspopup="dialog">Match 00:00</button><button class="clock" id="pointTimer" type="button" aria-label="View point timer history" aria-haspopup="dialog">Point 00:00</button></div>
-  <div class="buttons"><button id="restart" class="mini" type="button">↻ Restart</button><button id="pauseBtn" class="mini" type="button">⏸ Pause</button><button id="menuButton" class="mini" type="button" aria-label="Open game menu" aria-haspopup="dialog" aria-controls="overlay">☰ Menu</button></div>
+  <div class="buttons"><button id="pauseBtn" class="mini" type="button">⏸ Pause</button><button id="menuButton" class="mini" type="button" aria-label="Open game menu" aria-haspopup="dialog" aria-controls="overlay">☰ Menu</button></div>
 </div>
 <button id="playerNameButton" type="button" class="player-name-button" aria-label="Change your player name" aria-haspopup="dialog">PLAYER</button>
 <div id="message" class="message" hidden aria-live="polite"></div>
 <div class="controls" id="controls"><div class="control" id="movementPad" data-control="slide" role="slider" aria-label="Slide your finger left or right to move Red Blobby" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" tabindex="0"><span class="slide-track"><span class="slide-thumb" id="slideThumb"></span></span></div><button class="control" type="button" data-control="jump" aria-label="Jump anywhere on the right half of the court"></button></div>
+<div id="serveGuide" class="serve-guide" role="status" hidden>Slide left side to move • Tap right side to jump and serve</div>
+<div id="pausePanel" class="game-action-panel" role="dialog" aria-modal="true" aria-labelledby="pauseTitle" hidden>
+ <div class="game-action-dialog">
+  <h2 id="pauseTitle">⏸ Game Paused</h2>
+  <p>Your scores and timers are saved until you resume.</p>
+  <button id="pauseResume" type="button">▶ Resume Match</button>
+  <button id="restart" type="button">↻ Restart Match</button>
+  <button id="pauseToMenu" type="button">☰ Main Menu</button>
+ </div>
+</div>
+<div id="discardPanel" class="game-action-panel confirm-panel" role="alertdialog" aria-modal="true" aria-labelledby="discardTitle" aria-describedby="discardText" hidden>
+ <div class="game-action-dialog">
+  <h2 id="discardTitle">Discard current match?</h2>
+  <p id="discardText">The current score and time will be lost.</p>
+  <button id="discardCancel" type="button">Cancel — Keep Match</button>
+  <button id="discardConfirm" type="button">Discard Match</button>
+ </div>
+</div>
 <div id="overlay" class="overlay"><div class="dialog"><h2 id="title">Ready to play?</h2><p id="detail">First to 15 points.</p><p id="finalMatchTime" class="final-match-time" hidden></p><button id="resumeMatch" type="button" hidden>▶ Resume Match</button><button id="wifiRematch" type="button" hidden>↻ Play Again — Same Wi-Fi</button><button id="start" type="button">▶ Play vs AI</button><button id="wifiModeButton" type="button" class="wifi-mode-button">📶 Local Wi-Fi — 2 Players</button><button id="settingsButton" class="opening-settings-button" type="button" aria-haspopup="dialog" aria-controls="settingsPanel" aria-expanded="false">⚙ Settings</button></div></div>
 </div>
 <div id="playerNamePanel" class="player-name-panel" role="dialog" aria-modal="true" aria-labelledby="playerNameTitle" hidden>
@@ -517,7 +593,16 @@ html:fullscreen body,html:-webkit-full-screen body{
   <div class="wifi-heading"><h2>📶 Local Wi-Fi Multiplayer</h2><button id="wifiCancel" type="button" aria-label="Close Wi-Fi pairing">✕</button></div>
   <p class="wifi-notice">Two smartphones on the <strong>same Wi-Fi or phone hotspot</strong>. No mobile data, account, Bluetooth, cloud server or online opponent.</p>
   <div id="wifiStep" class="wifi-step" aria-live="polite">Step 1 of 3 — Choose Create or Join</div>
+  <div id="wifiNextAction" class="wifi-next-action" hidden>
+   <strong id="wifiNextTitle">SHOW THIS QR</strong>
+   <span id="wifiNextDetail"></span>
+  </div>
   <p id="wifiStatus" role="status" aria-live="polite">Choose Create or Join.</p>
+  <div id="wifiErrorHelp" class="wifi-error-help" hidden>
+   <strong>No QR was generated. Pairing cannot continue yet.</strong>
+   <span>Check that Wi-Fi is on and both phones are on the same router or hotspot. Check the browser's Local Network permission, then retry. Some browsers block local WebRTC addresses entirely; if so, try another up-to-date browser or Wi-Fi network. No online server or Bluetooth is used.</span>
+   <button id="wifiRetry" type="button" hidden>↻ Retry Local Wi-Fi Pairing</button>
+  </div>
   <div id="wifiScanFeedback" class="wifi-scan-feedback" hidden>
    <progress id="wifiScanProgress" max="1" value="0" aria-label="QR pages scanned"></progress>
    <strong id="wifiScanCounter">Searching for the first QR page…</strong>
@@ -548,9 +633,9 @@ html:fullscreen body,html:-webkit-full-screen body{
  </section>
 </div>
 <div id="settingsPanel" class="settings-panel" role="dialog" aria-modal="true" aria-label="Game settings" hidden><div class="settings-dialog">
-<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.8.8</small></p>
+<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.9.0</small></p>
 <label class="settings-field">Difficulty<select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><p class="difficulty-note" id="difficultyDescription">Normal • balanced speed, timing and aim</p>
-<button id="sound" class="settings-action" type="button">🔊 Sound on</button>
+<button id="sound" class="settings-action" type="button">🔊 Sound on</button><button id="controlGuideSetting" class="settings-action" type="button">👆 Show controls guide</button>
 <button id="resetLearning" class="settings-action" type="button">🧠 Reset Blue AI</button>
 <button id="androidFullscreen" class="settings-action" type="button" hidden>⛶ Enter full screen</button>
 <button id="wifiSettingsButton" class="settings-action" type="button">📶 Local Wi-Fi Multiplayer</button>
