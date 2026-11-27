@@ -4,7 +4,7 @@
 // sends a synthetic click; keyboard/mouse click must remain usable.
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const page=fs.readFileSync('index.html','utf8');
-const ids=['restart','pauseBtn','settingsButton','matchTimer','pointTimer','playerNameButton'];
+const ids=['restart','pauseBtn','menuButton','settingsButton','matchTimer','pointTimer','playerNameButton'];
 for(const id of ids)assert(page.includes("bindHudButton('"+id+"'"),
  'The '+id+' control must use immediate touch activation');
 const transparentHud=page.slice(page.indexOf('/* v2.7.2: transparent HUD;'));
@@ -61,6 +61,14 @@ let restartCount=0;
 invoke('restart',()=>restartCount++);
 all.get('restart').fire('click','mouse');
 assert.equal(restartCount,1,'Mouse and keyboard click activation should still work');
+let menuCount=0;
+invoke('menuButton',()=>menuCount++);
+all.get('menuButton').fire('pointerdown','touch');
+all.get('menuButton').fire('pointerup','touch');
+all.get('menuButton').fire('click');
+assert.equal(menuCount,1,'Menu must open exactly once from a mobile touch');
+all.get('menuButton').fire('click','mouse');
+assert.equal(menuCount,1,'Synthetic follow-up click must not reopen menu');
 let settingsCount=0;
 invoke('settingsButton',()=>settingsCount++);
 all.get('settingsButton').fire('pointerup','touch');
