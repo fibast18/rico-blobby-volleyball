@@ -73,6 +73,7 @@ function createPeer(role){
   wakeAudio:()=>{},
   document:{hidden:false}
  };
+ ctx.updateControlGuide=()=>{};
  vm.createContext(ctx);
  vm.runInContext(clock,ctx,{timeout:1000});
  vm.runInContext(core,ctx,{timeout:1000});
