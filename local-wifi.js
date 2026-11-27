@@ -349,10 +349,8 @@
   });
   $('wifiScan').addEventListener('click',startScan);
   $('wifiRetry').addEventListener('click',()=>{
-   if(role==='host')createHost();
-   else{
-    $('wifiJoin').click();
-   }
+   if(role==='host')return createHost();
+   return $('wifiJoin').click();
   });
   $('wifiCancel').addEventListener('click',leave);
   $('wifiPrev').addEventListener('click',()=>{if(!qrPages.length)return;
