@@ -70,7 +70,9 @@ assert(clears>0,'Pause should release held touches');
 vm.runInContext('setPaused(false); loop(1500)',state);
 assert.equal(state.matchMs,200,'Resume continues match timer');
 assert.equal(state.pointMs,200,'Resume continues point timer');
-assert(page.includes('if(awaitServe)matchStarted=true;'),'First contact must arm match clock');
+assert(page.includes("if(awaitServe){\n  matchStarted=true;")&&
+ page.includes('firstServeContact();'),
+ 'First actual serve must start the match clock and dismiss first-serve instructions');
 assert(page.includes('if(matchStarted)matchMs+=rawDelta;'),'Match clock must wait for first contact');
 assert(page.includes('matchMs,pointMs,matchStarted,server'),'Saved matches must preserve start state');
 assert(page.includes("typeof v.matchStarted==='boolean'?v.matchStarted:"),
