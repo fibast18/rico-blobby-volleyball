@@ -14,8 +14,9 @@ assert(html.includes("recordMatchTime('completed');"),'Finished matches must rec
 assert(html.includes("recordMatchTime('restarted');"),'Restarting a played match must preserve its history');
 assert(html.includes('matchId,matchStartedAt,pointNumber,lastVolleySide'),
  'Paused match snapshot must preserve ledger identity');
-assert(html.includes('restoreSavedMatch();requestAnimationFrame(loop);'),
- 'Match restore must continue original ledger after app exit');
+assert(html.includes('restoreSavedMatch();')&&
+ html.includes('requestAnimationFrame(loop);'),
+ 'Match restore must continue original ledger and first-serve guidance after app exit');
 assert(html.includes('history-items{touch-action:pan-y!important}'),
  'The iPhone history list should scroll vertically');
 
