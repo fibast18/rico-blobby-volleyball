@@ -663,6 +663,29 @@ const red={x:195,y:ground,vy:0,vx:0,r:49.45,score:0,jelly:0,jellyV:0,movePhase:0
 const ball={x:195,y:260,vx:0,vy:0,r:36};
 let running=false,paused=false,matchStarted=false,matchMs=0,pointMs=0,awaitServe=true,last=0,frame=0,sound=true,audio=null,scoreTimer=0,server='red',serveDelay=0,rallyTicks=0,lastTouch=null,touchLock=0,cpuJumpCooldown=0,cpuJumpArmed=true,cpuJumpPlan=null;
 const pressed={jump:false};
+let firstServeCompleted=true,guidePinned=false,guideFadeSerial=0;
+function updateControlGuide(){
+ const guide=$('serveGuide'),controls=$('controls');
+ const visible=running&&(!firstServeCompleted||guidePinned);
+ $('controlGuideSetting').textContent=guidePinned?
+  '👆 Hide controls guide':'👆 Show controls guide';
+ const serial=++guideFadeSerial;
+ if(visible){
+  guide.hidden=false;guide.classList.remove('fading');
+  controls.classList.add('guide-active');
+ }else if(!guide.hidden){
+  guide.classList.add('fading');
+  controls.classList.remove('guide-active');
+  setTimeout(()=>{
+   if(serial===guideFadeSerial)guide.hidden=true;
+  },750);
+ }else controls.classList.remove('guide-active');
+}
+function firstServeContact(){
+ if(firstServeCompleted)return;
+ firstServeCompleted=true;
+ updateControlGuide();
+}
 let localMode='ai',peerName='OPPONENT',remoteInput={x:.5,jump:false};
 let lastRemoteFrame=0,lastInputFrame=0,localSnapshotId=0;
 let slidePointerId=null,slideTargetX=null;
@@ -1062,10 +1085,81 @@ function showFinalMatchTime(durationMs){
  label.textContent='Match time: '+clockText(durationMs);
  label.hidden=false;
 }
+// Pause opens an actual pause menu, not an instantly destructive Restart.
+let pendingDiscardAction=null;
+function openPauseMenu(){
+ if(!running||!$('overlay').hidden)return;
+ setPaused(true);
+ $('pausePanel').hidden=false;
+}
+function resumePauseMenu(){
+ if(!running)return;
+ $('pausePanel').hidden=true;
+ setPaused(false);
+}
+function requestDiscardConfirmation(message,action){
+ if(!running){action();return}
+ pendingDiscardAction=action;
+ $('discardText').textContent=message;
+ $('discardPanel').hidden=false;
+}
+function cancelDiscard(){
+ pendingDiscardAction=null;
+ $('discardPanel').hidden=true;
+}
+function confirmDiscard(){
+ const action=pendingDiscardAction;
+ pendingDiscardAction=null;
+ $('discardPanel').hidden=true;
+ if(action)action();
+}
+function discardActiveMatch(){
+ if(!running)return;
+ recordMatchTime('abandoned');
+ running=false;paused=false;
+ clearInput();clearSavedMatch();
+ if(localMode!=='ai'&&LocalWifi.active){
+  LocalWifi.leave();localMode='ai';updatePeerLabel();
+ }
+ $('pausePanel').hidden=true;
+ $('overlay').hidden=false;
+ $('resumeMatch').hidden=true;
+ $('finalMatchTime').hidden=true;
+ setLocalRematchAvailable(false);
+ $('title').textContent='Ready to play?';
+ $('detail').textContent='First to 15 points.';
+ $('start').textContent='▶ Play vs AI';
+ $('status').textContent='Ready';
+ updateControlGuide();
+}
+function startAiFromMenu(){
+ requestDiscardConfirmation(
+  'Start a new AI match? The current score and match time will be discarded.',
+  ()=>{
+   requestImmersiveGameFullscreen();
+   if(localMode!=='ai'&&LocalWifi.active){
+    discardActiveMatch();
+    if(LocalWifi.active)LocalWifi.leave();
+    localMode='ai';updatePeerLabel();
+   }
+   wakeAudio();begin();
+  });
+}
+function openWifiFromMenu(){
+ requestDiscardConfirmation(
+  'Leave the current match and open Wi-Fi pairing? Scores and match time will be discarded.',
+  ()=>{
+   if(running)discardActiveMatch();
+   requestImmersiveGameFullscreen();wakeAudio();
+   $('settingsPanel').hidden=true;
+   LocalWifi.openPairing();
+  });
+}
 // Opening the menu is NOT a restart: keep scores, ball, clocks, AI and the
 // existing peer-to-peer channel in place until the player chooses a mode.
 function openGameMenu(){
  if(!running)return; // The initial/final menu is already visible.
+ $('pausePanel').hidden=true;
  setPaused(true);
  clearInput();
  $('title').textContent='Game Menu';
@@ -1097,11 +1191,15 @@ function begin(){
  clearSavedMatch();lastSnapshotMs=0;newMatchIdentity();
  updateLearningLabel();
  red.score=0;blue.score=0;frame=0;
+ $('pausePanel').hidden=true;
+ $('discardPanel').hidden=true;
+ firstServeCompleted=false;
  $('finalMatchTime').hidden=true;
  $('resumeMatch').hidden=true;
  setLocalRematchAvailable(false);
  matchMs=0;pointMs=0;matchStarted=false;paused=false;
  serveReset('red');running=true;
+ updateControlGuide();
  $('overlay').hidden=true;$('settingsPanel').hidden=true;
  $('pauseBtn').textContent='⏸ Pause';
  $('pauseBtn').setAttribute('aria-pressed','false');
@@ -1116,11 +1214,13 @@ function restart(){
  if(localMode==='host')LocalWifi.send({t:'restart-start'});
 }
 function finish(){
+ firstServeCompleted=true;
  if(localMode==='host')
   LocalWifi.send({t:'end',red:red.score,blue:blue.score,matchMs});
  playRefereeWhistle('end');
  recordMatchTime('completed');
  running=false;paused=false;clearInput();clearSavedMatch();
+ updateControlGuide();
  const finalScore=red.score+' : '+blue.score;
  $('title').textContent=red.score>=15?'Red wins! 🎉':'Blue wins!';
  $('detail').textContent='Final score '+finalScore;
@@ -1211,7 +1311,10 @@ function collide(p){
  const limitX=10.7*(W/800);
  ball.vx=Math.max(-limitX,Math.min(limitX,vx));
  ball.vy=Math.max(-15,Math.min(9,vy));
- if(awaitServe)matchStarted=true; // First actual serve contact, not Play button.
+ if(awaitServe){
+  matchStarted=true; // First actual serve contact, not Play button.
+  firstServeContact();
+ }
  awaitServe=false;rallyTicks=0;
  playTone(390);
  if(localMode==='host')LocalWifi.send({t:'hit'});
@@ -1964,12 +2067,15 @@ function beginGuestMatch(){
  if(running)recordMatchTime('restarted');
  clearSavedMatch();newMatchIdentity();
  clearInput();
+ $('pausePanel').hidden=true;
+ firstServeCompleted=false;
  setLocalRematchAvailable(false);
  $('resumeMatch').hidden=true;
  $('finalMatchTime').hidden=true;
  red.score=0;blue.score=0;
  matchMs=0;pointMs=0;matchStarted=false;
  paused=false;running=true;awaitServe=true;
+ updateControlGuide();
  $('overlay').hidden=true;$('settingsPanel').hidden=true;
  $('pauseBtn').textContent='⏸ Pause';
  $('status').textContent='Playing';
@@ -1999,6 +2105,7 @@ function receiveLocalState(data){
  matchMs=clamp(Number(data.matchMs)||0,0,24*3600*1000);
  pointMs=clamp(Number(data.pointMs)||0,0,matchMs);
  matchStarted=!!data.matchStarted;awaitServe=!!data.awaitServe;
+ if(matchStarted)firstServeContact();
  server=data.server==='blue'?'blue':'red';
  running=!!data.running;paused=!!data.paused;
  $('status').textContent=running?(paused?'Paused':'Playing'):'Finished';
@@ -2066,6 +2173,7 @@ function localWifiMessage(data){
    recordMatchTime('completed');
    playRefereeWhistle('end');
    running=false;paused=false;
+   firstServeCompleted=true;updateControlGuide();
    $('title').textContent=red.score>=15?'Red wins! 🎉':'Blue wins!';
    $('detail').textContent='Final score '+blue.score+' : '+red.score;
    $('resumeMatch').hidden=true;
@@ -2092,6 +2200,8 @@ LocalWifi.attach({
  onDisconnected:()=>{
   if(localMode!=='ai'){
    running=false;paused=false;localMode='ai';
+   firstServeCompleted=true;updateControlGuide();
+   $('pausePanel').hidden=true;
    setLocalRematchAvailable(false);
    peerName='OPPONENT';updatePeerLabel();
    $('title').textContent='Wi-Fi connection ended';
@@ -2162,7 +2272,10 @@ window.addEventListener('online',maybeCheck);
 window.addEventListener('focus',maybeCheck);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)maybeCheck()});
 setInterval(()=>{if(!document.hidden)maybeCheck()},15*60*1000);
-resizeCourt();renderBackdrop();serveReset();restoreSavedMatch();requestAnimationFrame(loop);maybeCheck();
+resizeCourt();renderBackdrop();serveReset();restoreSavedMatch();
+firstServeCompleted=!!matchStarted||!running;
+updateControlGuide();
+requestAnimationFrame(loop);maybeCheck();
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 })();
 </script></main></body></html>
