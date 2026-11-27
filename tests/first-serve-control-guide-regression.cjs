@@ -54,6 +54,7 @@ assert.match(els.get('controlGuideSetting').textContent,/Show controls/);
 vm.runInContext('running=false;firstServeCompleted=false;updateControlGuide()',context);
 assert.equal(guide.hidden,true,'Instructions do not cover opening/final result screen');
 assert(html.includes('firstServeCompleted=false;')&&
- html.includes("serveReset('red');running=true;\n updateControlGuide();"),
+ html.includes("serveReset('red');running=true;")&&
+ html.includes("updateMatchLevelBadge();\n updateControlGuide();"),
  'Every new match must give new players a visible first-serve introduction');
 console.log('First-serve slider and jump cues, fade, AI/Wi-Fi serve timing and Settings replay passed.');
