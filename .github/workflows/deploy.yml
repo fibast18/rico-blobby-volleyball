@@ -45,6 +45,7 @@ jobs:
           node tests/net-and-touch-regression.cjs
           node tests/touch-slider-and-rally-regression.cjs
           node tests/mobile-hud-and-timers-regression.cjs
+          node tests/match-start-difficulty-screenshot-regression.cjs
           node tests/in-game-menu-regression.cjs
           node tests/first-serve-control-guide-regression.cjs
           node tests/pause-and-discard-safety-regression.cjs
