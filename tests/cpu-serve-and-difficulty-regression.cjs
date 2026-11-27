@@ -24,6 +24,7 @@ function simulateServe(mode='normal',width=800){
   updateMovementVisual:()=>{},playTone:()=>{},sandSound:()=>{},
   score:()=>{},serveReset:()=>{},
  };
+ s.firstServeContact=()=>{};
  vm.createContext(s);vm.runInContext(source,s,{timeout:1000});
  let hitAt=null,firstJump=null;
  for(let i=0;i<180;i++){
@@ -59,6 +60,7 @@ function defend(mode,frames=5){
   $:id=>id==='difficulty'?{value:mode}:{textContent:''},
   updateMovementVisual:()=>{},playTone:()=>{},sandSound:()=>{},score:()=>{},serveReset:()=>{}
  };
+ s.firstServeContact=()=>{};
  vm.createContext(s);vm.runInContext(source,s,{timeout:1000});
  for(let i=0;i<frames;i++)vm.runInContext('tick(1)',s,{timeout:1000});
  const moved=670-s.blue.x;
