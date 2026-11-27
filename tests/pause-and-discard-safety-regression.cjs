@@ -38,7 +38,7 @@ function peer(mode='ai'){
   heldJumpPointers:{clear(){}},saveMatch(){},updateTimers(){},
   LocalWifi:{active:mode!=='ai',connected:mode!=='ai',send:m=>{calls.network.push(m);return true},leave(){calls.discarded++;this.active=false;this.connected=false}},
   recordMatchTime:()=>calls.discarded++,clearSavedMatch(){},
-  updatePeerLabel(){},updateControlGuide(){},
+  updatePeerLabel(){},updateControlGuide(){},updateMatchLevelBadge(){},
   setLocalRematchAvailable(){},
   requestImmersiveGameFullscreen(){},
   wakeAudio(){},
