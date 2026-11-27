@@ -14,13 +14,19 @@ const hud=html.slice(html.indexOf('<div class="hud">'),
 const result=html.slice(html.indexOf('<div id="overlay"'),
  html.indexOf('<div id="playerNamePanel"'));
 assert(hud.includes('id="matchTimer"')&&hud.includes('id="difficultyHud"'),
- 'The match timer and level must be visible in the active-game HUD');
+ 'Match timer and level must be visible in active-game HUD');
+assert(hud.indexOf('id="difficultyHud"')<hud.indexOf('id="matchTimer"'),
+ 'Difficulty replaces Playing/Paused at upper-left before both clocks');
+assert(hud.includes('id="status" class="hud-announcement"'),
+ 'Playing/Paused stays announced to accessibility tools, not shown in screenshot');
+assert(!html.includes('<div id="difficultyHud"'),
+ 'Separate difficulty badge must be removed from upper-right');
 assert(result.includes('id="finalDifficulty" class="final-difficulty" hidden'),
  'Final-score pop-up must include a separate difficulty label');
 assert(result.indexOf('id="finalMatchTime"')<result.indexOf('id="finalDifficulty"'),
  'Completed level must appear underneath the score and duration');
-assert(html.includes("if(matchStarted)matchMs+=rawDelta;"),
- 'A match cannot count time before the first real serve');
+assert(html.includes("if(matchStarted&&!awaitServe)matchMs+=rawDelta;"),
+ 'A match cannot count time before a serve OR between active rallies');
 assert(html.includes("if(awaitServe){\n  matchStarted=true;"),
  'Opening serve collision must activate the match clock');
 assert(html.includes('firstServeContact();'),
@@ -88,14 +94,18 @@ vm.runInContext('loop(1550)',ctx);
 assert.equal(ctx.matchMs,150,'Resume continues from saved duration');
 
 // A later point resets the rally clock but NOT the match clock.
+// Remain idle before its next serve and verify NO match time is charged.
 ctx.pointMs=0;ctx.awaitServe=true;
+vm.runInContext('loop(1600);loop(1700);loop(1800)',ctx);
+assert.equal(ctx.matchMs,150,'Waiting for second serve must freeze match duration');
+assert.equal(ctx.pointMs,0,'Point clock must remain 00:00 while the ball sits idle');
 ctx.lastTouch=null;ctx.touchLock=0;ctx.lastVolleySide=null;
 ctx.consecutiveTouches=0;ctx.red.hitCooldown=0;
 ctx.ball={x:ctx.red.x,y:ctx.red.y-ctx.red.r*1.05-60,vx:0,vy:5,r:36};
 assert.equal(vm.runInContext('collide(red)',ctx),true);
 assert.equal(ctx.matchMs,150,'Subsequent serves must not reset the match clock');
-vm.runInContext('loop(1600)',ctx);
-assert.equal(ctx.matchMs,200,'Match continues after later points');
+vm.runInContext('loop(1850)',ctx);
+assert.equal(ctx.matchMs,200,'Match resumes counting after the next actual hit');
 assert.equal(ctx.pointMs,50,'Only point clock restarts on the next serve');
 
 // Screenshot metadata must show the SAME difficulty value the CPU's
@@ -106,20 +116,20 @@ for(const value of ['easy','normal','hard']){
  el('difficulty').value=value;
  vm.runInContext('updateMatchLevelBadge()',ctx);
  assert.equal(el('difficultyHud').textContent,
-  'Difficulty: '+value[0].toUpperCase()+value.slice(1));
+  value[0].toUpperCase()+value.slice(1));
  vm.runInContext('showFinalMatchLevel()',ctx);
  assert.equal(el('finalDifficulty').textContent,
   'Difficulty: '+value[0].toUpperCase()+value.slice(1));
  assert.equal(el('finalDifficulty').hidden,false);
 }
 el('difficulty').value='easy';
-assert.equal(el('finalDifficulty').textContent,'Difficulty: Hard',
+assert.equal(el('finalDifficulty').textContent,'Hard',
  'Completed screenshot must retain its finished difficulty if Settings changes');
 ctx.localMode='host';
 vm.runInContext('updateMatchLevelBadge();showFinalMatchLevel()',ctx);
-assert.equal(el('difficultyHud').textContent,'Mode: Wi-Fi • 2 Players');
-assert.equal(el('finalDifficulty').textContent,'Mode: Wi-Fi • 2 Players');
+assert.equal(el('difficultyHud').textContent,'Wi-Fi');
+assert.equal(el('finalDifficulty').textContent,'Wi-Fi');
 ctx.localMode='guest';
 vm.runInContext('updateMatchLevelBadge()',ctx);
 assert.equal(el('difficultyHud').textContent,'Mode: Wi-Fi • 2 Players');
-console.log('Actual first-serve hit starts match clock; pause/next-point continuity and screenshot difficulty on both modes passed.');
+console.log('Match timer freezes before every serve and resumes on ball contact; concise Easy/Normal/Hard replaces top-left status in snapshots.');
