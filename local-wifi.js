@@ -213,7 +213,7 @@
    await pc.setLocalDescription(await pc.createOffer());
    const code=await makeSignal('offer');
    showCode(code);
-   if(!$('wifiQr').querySelector?.('svg'))
+   if(!$('wifiQr').innerHTML.includes('<svg'))
     throw Error('Unable to draw the QR code on this device.');
    setStep('Step 2 of 3 — Show this QR to Player 2');
    showNextAction('SHOW THIS QR','Hold this screen steady while Player 2 scans every QR page.');
@@ -234,7 +234,7 @@
    showNextAction('PREPARING ANSWER QR','Wait for the browser to provide its local Wi-Fi address.');
    setStatus('Preparing response for the host…');
    const code=await makeSignal('answer');showCode(code);
-   if(!$('wifiQr').querySelector?.('svg'))
+   if(!$('wifiQr').innerHTML.includes('<svg'))
     throw Error('Unable to draw the answer QR code on this device.');
    showNextAction('SHOW THIS QR','Player 1 must now scan your answer QR pages.');
    setStep('Step 2 of 3 — Show your answer QR to Player 1');
