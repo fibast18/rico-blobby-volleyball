@@ -30,7 +30,9 @@ assert(page.includes("document.addEventListener('visibilitychange',()=>{if(docum
 assert(page.includes("window.addEventListener('pagehide',pauseOnExit)"),
  'Leaving the game must pause it');
 assert(page.includes('function saveMatch()')&&page.includes('function restoreSavedMatch()'),'Paused match must survive iOS app unload');
-assert(page.includes('restoreSavedMatch();requestAnimationFrame(loop);'),'Game should restore a paused match automatically on launch');
+assert(page.includes("serveReset();restoreSavedMatch();")&&
+ page.includes("updateControlGuide();\nrequestAnimationFrame(loop);"),
+ 'Game should restore a paused match and its first-serve help before animation');
 
 const elements={};
 for(const name of ['matchTimer','pointTimer','pauseBtn','status']){
