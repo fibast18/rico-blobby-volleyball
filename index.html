@@ -481,16 +481,24 @@ html:fullscreen body,html:-webkit-full-screen body{
  touch-action:manipulation;
 }
 .overlay .dialog #settingsButton:active{opacity:.72}
+/* v2.8.8 — return to the opening menu without resetting a match. */
+.overlay .dialog #resumeMatch[hidden]{display:none!important}
+.overlay .dialog #resumeMatch{
+ display:block;margin:8px auto 10px;min-height:48px;
+ width:min(100%,315px);padding:12px 18px;border-radius:12px;
+ background:#ffdb66;color:#17374d;font:800 clamp(15px,2.2vw,18px) system-ui;
+ touch-action:manipulation;
+}
 </style></head><body class="fullscreen"><main>
 <div id="stage" class="stage"><canvas id="game" width="800" height="500" aria-label="Red and blue blobs playing volleyball on a beach"></canvas>
 <div class="hud">
   <div class="left-hud"><span id="status" class="mini" aria-live="polite">Ready</span><button class="clock" id="matchTimer" type="button" aria-label="View match timer history" aria-haspopup="dialog">Match 00:00</button><button class="clock" id="pointTimer" type="button" aria-label="View point timer history" aria-haspopup="dialog">Point 00:00</button></div>
-  <div class="buttons"><button id="restart" class="mini" type="button">↻ Restart</button><button id="pauseBtn" class="mini" type="button">⏸ Pause</button></div>
+  <div class="buttons"><button id="restart" class="mini" type="button">↻ Restart</button><button id="pauseBtn" class="mini" type="button">⏸ Pause</button><button id="menuButton" class="mini" type="button" aria-label="Open game menu" aria-haspopup="dialog" aria-controls="overlay">☰ Menu</button></div>
 </div>
 <button id="playerNameButton" type="button" class="player-name-button" aria-label="Change your player name" aria-haspopup="dialog">PLAYER</button>
 <div id="message" class="message" hidden aria-live="polite"></div>
 <div class="controls" id="controls"><div class="control" id="movementPad" data-control="slide" role="slider" aria-label="Slide your finger left or right to move Red Blobby" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" tabindex="0"><span class="slide-track"><span class="slide-thumb" id="slideThumb"></span></span></div><button class="control" type="button" data-control="jump" aria-label="Jump anywhere on the right half of the court"></button></div>
-<div id="overlay" class="overlay"><div class="dialog"><h2 id="title">Ready to play?</h2><p id="detail">First to 15 points.</p><p id="finalMatchTime" class="final-match-time" hidden></p><button id="wifiRematch" type="button" hidden>↻ Play Again — Same Wi-Fi</button><button id="start" type="button">▶ Play vs AI</button><button id="wifiModeButton" type="button" class="wifi-mode-button">📶 Local Wi-Fi — 2 Players</button><button id="settingsButton" class="opening-settings-button" type="button" aria-haspopup="dialog" aria-controls="settingsPanel" aria-expanded="false">⚙ Settings</button></div></div>
+<div id="overlay" class="overlay"><div class="dialog"><h2 id="title">Ready to play?</h2><p id="detail">First to 15 points.</p><p id="finalMatchTime" class="final-match-time" hidden></p><button id="resumeMatch" type="button" hidden>▶ Resume Match</button><button id="wifiRematch" type="button" hidden>↻ Play Again — Same Wi-Fi</button><button id="start" type="button">▶ Play vs AI</button><button id="wifiModeButton" type="button" class="wifi-mode-button">📶 Local Wi-Fi — 2 Players</button><button id="settingsButton" class="opening-settings-button" type="button" aria-haspopup="dialog" aria-controls="settingsPanel" aria-expanded="false">⚙ Settings</button></div></div>
 </div>
 <div id="playerNamePanel" class="player-name-panel" role="dialog" aria-modal="true" aria-labelledby="playerNameTitle" hidden>
  <form id="playerNameForm" class="player-name-dialog">
@@ -540,7 +548,7 @@ html:fullscreen body,html:-webkit-full-screen body{
  </section>
 </div>
 <div id="settingsPanel" class="settings-panel" role="dialog" aria-modal="true" aria-label="Game settings" hidden><div class="settings-dialog">
-<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.8.7</small></p>
+<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.8.8</small></p>
 <label class="settings-field">Difficulty<select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><p class="difficulty-note" id="difficultyDescription">Normal • balanced speed, timing and aim</p>
 <button id="sound" class="settings-action" type="button">🔊 Sound on</button>
 <button id="resetLearning" class="settings-action" type="button">🧠 Reset Blue AI</button>
@@ -969,6 +977,26 @@ function showFinalMatchTime(durationMs){
  label.textContent='Match time: '+clockText(durationMs);
  label.hidden=false;
 }
+// Opening the menu is NOT a restart: keep scores, ball, clocks, AI and the
+// existing peer-to-peer channel in place until the player chooses a mode.
+function openGameMenu(){
+ if(!running)return; // The initial/final menu is already visible.
+ setPaused(true);
+ clearInput();
+ $('title').textContent='Game Menu';
+ $('detail').textContent='Match paused. Resume, choose a mode, or open Settings.';
+ $('finalMatchTime').hidden=true;
+ $('resumeMatch').hidden=false;
+ setLocalRematchAvailable(false);
+ $('start').textContent=localMode==='ai'?'▶ New AI Match':'Leave Wi-Fi • Play vs AI';
+ $('overlay').hidden=false;
+}
+function resumeGameFromMenu(){
+ if(!running)return;
+ $('resumeMatch').hidden=true;
+ $('overlay').hidden=true;
+ setPaused(false);
+}
 function setLocalRematchAvailable(available){
  const button=$('wifiRematch');
  button.hidden=!available;
@@ -985,6 +1013,7 @@ function begin(){
  updateLearningLabel();
  red.score=0;blue.score=0;frame=0;
  $('finalMatchTime').hidden=true;
+ $('resumeMatch').hidden=true;
  setLocalRematchAvailable(false);
  matchMs=0;pointMs=0;matchStarted=false;paused=false;
  serveReset('red');running=true;
@@ -1010,6 +1039,7 @@ function finish(){
  const finalScore=red.score+' : '+blue.score;
  $('title').textContent=red.score>=15?'Red wins! 🎉':'Blue wins!';
  $('detail').textContent='Final score '+finalScore;
+ $('resumeMatch').hidden=true;
  showFinalMatchTime(matchMs);
  $('start').textContent=localMode==='ai'?'↻ Play Again':'Leave Wi-Fi • Play vs AI';
  setLocalRematchAvailable(localMode==='host'&&LocalWifi.connected);
@@ -1772,6 +1802,11 @@ bindHudButton('pauseBtn',()=>{
  if(paused)requestImmersiveGameFullscreen();
  wakeAudio();setPaused(!paused);
 });
+bindHudButton('menuButton',openGameMenu);
+$('resumeMatch').onclick=()=>{
+ requestImmersiveGameFullscreen();
+ resumeGameFromMenu();
+};
 bindHudButton('settingsButton',()=>{
  setPaused(true);
  $('settingsPanel').hidden=false;
@@ -1845,6 +1880,7 @@ function beginGuestMatch(){
  clearSavedMatch();newMatchIdentity();
  clearInput();
  setLocalRematchAvailable(false);
+ $('resumeMatch').hidden=true;
  $('finalMatchTime').hidden=true;
  red.score=0;blue.score=0;
  matchMs=0;pointMs=0;matchStarted=false;
@@ -1947,6 +1983,7 @@ function localWifiMessage(data){
    running=false;paused=false;
    $('title').textContent=red.score>=15?'Red wins! 🎉':'Blue wins!';
    $('detail').textContent='Final score '+blue.score+' : '+red.score;
+   $('resumeMatch').hidden=true;
    showFinalMatchTime(matchMs);
    $('start').textContent='Leave Wi-Fi • Play vs AI';
    setLocalRematchAvailable(LocalWifi.connected);
@@ -1974,6 +2011,7 @@ LocalWifi.attach({
    peerName='OPPONENT';updatePeerLabel();
    $('title').textContent='Wi-Fi connection ended';
    $('detail').textContent='Reconnect using Local Wi-Fi, or play against Blue AI.';
+   $('resumeMatch').hidden=true;
    $('finalMatchTime').hidden=true;
    $('start').textContent='▶ Play vs AI';
    $('overlay').hidden=false;$('status').textContent='Ready';
