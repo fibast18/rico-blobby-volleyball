@@ -18,6 +18,7 @@ const state={
  updateMovementVisual:()=>{},$:()=>({textContent:''}),
  clamp:(n,a,b)=>Math.max(a,Math.min(b,n))
 };
+state.firstServeContact=()=>{};
 vm.createContext(state);
 vm.runInContext(page.slice(first,last),state,{timeout:1000});
 vm.runInContext('tick(1)',state);
@@ -48,6 +49,7 @@ const guest={
  LocalWifi:{send:message=>{sent=message;return true}},
  updateTimers:()=>{timers++},updateMovementVisual:()=>{}
 };
+guest.firstServeContact=()=>{};
 vm.createContext(guest);
 vm.runInContext(page.slice(begin,end),guest,{timeout:1000});
 guest.snapshot={
