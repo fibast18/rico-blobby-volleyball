@@ -12,6 +12,13 @@ assert(page.includes('id="settingsButton"'),'Opening Settings option missing');
 const hud=page.slice(page.indexOf('<div class="hud">'),page.indexOf('</div>\n<button id="playerNameButton"'));
 const opening=page.slice(page.indexOf('<div id="overlay"'),page.indexOf('<div id="playerNamePanel"'));
 assert(!hud.includes('id="settingsButton"'),'Gameplay HUD should no longer show the Settings gear');
+assert(hud.includes('<span id="difficultyHud" class="mini difficulty-hud"') &&
+ hud.indexOf('id="difficultyHud"')<hud.indexOf('id="matchTimer"'),
+ 'Difficulty replaces Playing / Paused at upper-left, before both clocks');
+assert(hud.includes('id="status" class="hud-announcement"'),
+ 'Gameplay status must remain accessible but not visible next to the level');
+assert(!page.includes('<div id="difficultyHud"'),
+ 'Remove the separate difficulty badge from the right side of the court');
 assert(opening.includes('id="settingsButton"'),'Settings must be in opening pop-up');
 assert(opening.indexOf('id="settingsButton"')>opening.indexOf('id="wifiModeButton"'),
  'Settings must appear directly below Local Wi-Fi — 2 Players');
@@ -70,10 +77,20 @@ assert(clears>0,'Pause should release held touches');
 vm.runInContext('setPaused(false); loop(1500)',state);
 assert.equal(state.matchMs,200,'Resume continues match timer');
 assert.equal(state.pointMs,200,'Resume continues point timer');
+// Every later serve must freeze both timers, even after matchStarted became true.
+state.awaitServe=true;
+vm.runInContext('loop(1600);loop(1700);loop(1800)',state);
+assert.equal(state.matchMs,200,'Waiting for a later serve cannot consume match time');
+assert.equal(state.pointMs,200,'Waiting for a later serve cannot consume point time');
+state.awaitServe=false;
+vm.runInContext('loop(1900)',state);
+assert.equal(state.matchMs,300,'The next rally resumes accumulated match time');
+assert.equal(state.pointMs,300);
 assert(page.includes("if(awaitServe){\n  matchStarted=true;")&&
  page.includes('firstServeContact();'),
  'First actual serve must start the match clock and dismiss first-serve instructions');
-assert(page.includes('if(matchStarted)matchMs+=rawDelta;'),'Match clock must wait for first contact');
+assert(page.includes('if(matchStarted&&!awaitServe)matchMs+=rawDelta;'),
+ 'Match clock must wait for each serve and count ONLY while the ball is in action');
 assert(page.includes('matchMs,pointMs,matchStarted,server'),'Saved matches must preserve start state');
 assert(page.includes("typeof v.matchStarted==='boolean'?v.matchStarted:"),
  'Restored older matches must infer whether the clock had started');
