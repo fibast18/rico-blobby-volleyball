@@ -8,7 +8,13 @@ function section(from,to){
 }
 assert(page.includes('<body class="fullscreen">'),'The iPhone game must launch in app-sized fullscreen layout');
 assert(page.includes('id="pauseBtn"'),'Pause control missing');
-assert(page.includes('id="settingsButton"'),'Gear settings missing');
+assert(page.includes('id="settingsButton"'),'Opening Settings option missing');
+const hud=page.slice(page.indexOf('<div class="hud">'),page.indexOf('</div>\n<button id="playerNameButton"'));
+const opening=page.slice(page.indexOf('<div id="overlay"'),page.indexOf('<div id="playerNamePanel"'));
+assert(!hud.includes('id="settingsButton"'),'Gameplay HUD should no longer show the Settings gear');
+assert(opening.includes('id="settingsButton"'),'Settings must be in opening pop-up');
+assert(opening.indexOf('id="settingsButton"')>opening.indexOf('id="wifiModeButton"'),
+ 'Settings must appear directly below Local Wi-Fi — 2 Players');
 assert(page.includes('id="matchTimer"')&&page.includes('id="pointTimer"'),'Both game timers required');
 assert(page.includes('id="settingsPanel"'),'Settings dialog missing');
 for(const id of ['difficulty','sound','resetLearning','closeSettings','restart']){
