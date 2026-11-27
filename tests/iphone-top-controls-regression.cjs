@@ -4,7 +4,7 @@
 // sends a synthetic click; keyboard/mouse click must remain usable.
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const page=fs.readFileSync('index.html','utf8');
-const ids=['restart','pauseBtn','menuButton','settingsButton','matchTimer','pointTimer','playerNameButton'];
+const ids=['pauseBtn','menuButton','settingsButton','matchTimer','pointTimer','playerNameButton'];
 for(const id of ids)assert(page.includes("bindHudButton('"+id+"'"),
  'The '+id+' control must use immediate touch activation');
 const transparentHud=page.slice(page.indexOf('/* v2.7.2: transparent HUD;'));
@@ -57,10 +57,7 @@ pause.fire('click');
 assert.equal(pauseCount,1,'Synthesized click must not double-toggle Pause');
 pause.fire('pointercancel');
 assert(!pause.names.has('tapping'),'Cancelled gestures must clear pressed state');
-let restartCount=0;
-invoke('restart',()=>restartCount++);
-all.get('restart').fire('click','mouse');
-assert.equal(restartCount,1,'Mouse and keyboard click activation should still work');
+// Restart is inside the pause dialog, not a top HUD touch button.
 let menuCount=0;
 invoke('menuButton',()=>menuCount++);
 all.get('menuButton').fire('pointerdown','touch');
