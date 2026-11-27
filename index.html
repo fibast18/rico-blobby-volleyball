@@ -1941,12 +1941,7 @@ stage.addEventListener('touchmove',e=>{if(e.target.closest('[data-control]'))e.p
 window.addEventListener('blur',pauseOnExit);
 window.addEventListener('pagehide',pauseOnExit);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)pauseOnExit()});
-$('start').onclick=()=>{
- // Must request fullscreen synchronously inside this real button click.
- requestImmersiveGameFullscreen();
- if(LocalWifi.active){LocalWifi.leave();localMode='ai';updatePeerLabel()}
- wakeAudio();begin();
-};
+$('start').onclick=startAiFromMenu;
 // iOS can delay or lose the synthesized click over a touch-action:none
 // game court. Handle a finger's pointerup immediately and suppress its
 // subsequent synthetic click, while retaining keyboard/mouse activation.
@@ -1985,11 +1980,15 @@ $('playerNamePanel').addEventListener('pointerdown',event=>{
 document.addEventListener('keydown',event=>{
  if(event.key==='Escape'&&!$('playerNamePanel').hidden)closePlayerNameEditor();
 });
-bindHudButton('restart',()=>{requestImmersiveGameFullscreen();restart()});
-bindHudButton('pauseBtn',()=>{
- if(paused)requestImmersiveGameFullscreen();
- wakeAudio();setPaused(!paused);
-});
+bindHudButton('pauseBtn',()=>{wakeAudio();openPauseMenu()});
+$('pauseResume').onclick=()=>{requestImmersiveGameFullscreen();resumePauseMenu()};
+$('pauseToMenu').onclick=openGameMenu;
+$('restart').onclick=()=>requestDiscardConfirmation(
+ 'Restart this match from 0–0? The current score and match time will be discarded.',
+ ()=>{$('pausePanel').hidden=true;restart()}
+);
+$('discardCancel').onclick=cancelDiscard;
+$('discardConfirm').onclick=confirmDiscard;
 bindHudButton('menuButton',openGameMenu);
 $('resumeMatch').onclick=()=>{
  requestImmersiveGameFullscreen();
@@ -2021,6 +2020,7 @@ const updateDifficultyDescription=()=>{
 $('difficulty').addEventListener('change',updateDifficultyDescription);
 updateDifficultyDescription();
 $('sound').onclick=()=>{sound=!sound;$('sound').textContent=sound?'🔊 Sound on':'🔇 Sound off'};
+$('controlGuideSetting').onclick=()=>{guidePinned=!guidePinned;updateControlGuide()};
 $('resetLearning').onclick=()=>{
  learning=freshLearning();saveLearning();cpuAttempt=null;cpuHadTouch=false;updateLearningLabel();
  $('resetLearning').textContent='✓ Blue AI reset';
@@ -2218,16 +2218,8 @@ $('wifiRematch').onclick=()=>{
  wakeAudio();
  requestLocalRematch();
 };
-$('wifiModeButton').onclick=()=>{
- requestImmersiveGameFullscreen();wakeAudio();LocalWifi.openPairing();
-};
-$('wifiSettingsButton').onclick=()=>{
- requestImmersiveGameFullscreen();
- wakeAudio();
- if(running&&localMode==='ai')setPaused(true);
- $('settingsPanel').hidden=true;
- LocalWifi.openPairing();
-};
+$('wifiModeButton').onclick=openWifiFromMenu;
+$('wifiSettingsButton').onclick=openWifiFromMenu;
 
 document.body.classList.add('fullscreen');
 syncGameViewport();
