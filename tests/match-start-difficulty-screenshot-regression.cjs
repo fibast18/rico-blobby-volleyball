@@ -119,7 +119,7 @@ for(const value of ['easy','normal','hard']){
   value[0].toUpperCase()+value.slice(1));
  vm.runInContext('showFinalMatchLevel()',ctx);
  assert.equal(el('finalDifficulty').textContent,
-  'Difficulty: '+value[0].toUpperCase()+value.slice(1));
+  value[0].toUpperCase()+value.slice(1));
  assert.equal(el('finalDifficulty').hidden,false);
 }
 el('difficulty').value='easy';
@@ -131,5 +131,5 @@ assert.equal(el('difficultyHud').textContent,'Wi-Fi');
 assert.equal(el('finalDifficulty').textContent,'Wi-Fi');
 ctx.localMode='guest';
 vm.runInContext('updateMatchLevelBadge()',ctx);
-assert.equal(el('difficultyHud').textContent,'Mode: Wi-Fi • 2 Players');
+assert.equal(el('difficultyHud').textContent,'Wi-Fi');
 console.log('Match timer freezes before every serve and resumes on ball contact; concise Easy/Normal/Hard replaces top-left status in snapshots.');
