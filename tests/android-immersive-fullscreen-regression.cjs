@@ -20,12 +20,16 @@ assert(html.includes("document.addEventListener('fullscreenchange'"),
  'Game court must recalculate viewport after entering or exiting Android fullscreen');
 assert(html.includes("$('wifiStart').addEventListener('click',requestImmersiveGameFullscreen,{capture:true})"),
  'Multiplayer start must use the phone tap to request Android fullscreen');
-assert(html.includes("requestImmersiveGameFullscreen();wakeAudio();LocalWifi.openPairing()"),
- 'Wi-Fi pairing screen must enter immersive mode on its opening tap');
-const play=html.slice(html.indexOf("$('start').onclick=()=>{"),
- html.indexOf('// iOS can delay',html.indexOf("$('start').onclick=()=>{")));
+assert(html.includes("$('wifiModeButton').onclick=openWifiFromMenu;")&&
+ html.slice(html.indexOf('function openWifiFromMenu(){'),
+  html.indexOf('// Opening the menu is NOT a restart')).includes('requestImmersiveGameFullscreen();wakeAudio();'),
+ 'Wi-Fi pairing screen must enter immersive mode after the requested confirmation');
+assert(html.includes("$('start').onclick=startAiFromMenu;"),
+ 'Single-player button must use the safe game-mode handler');
+const play=html.slice(html.indexOf('function startAiFromMenu(){'),
+ html.indexOf('function openWifiFromMenu(){'));
 assert(play.includes('requestImmersiveGameFullscreen();'),
- 'Single-player Play must enter fullscreen as a synchronous tap action');
+ 'Single-player Play must enter fullscreen after any required discard confirmation');
 const from=html.indexOf('function isAndroidDevice(){');
 const until=html.indexOf('function resizeCourt(){',from);
 assert(from>0&&until>from,'Production Android fullscreen implementation not found');
