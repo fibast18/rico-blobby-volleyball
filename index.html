@@ -547,30 +547,28 @@ html:fullscreen body,html:-webkit-full-screen body{
 @media(max-height:380px){.game-action-dialog{padding:10px;gap:6px}
  .game-action-dialog h2{font-size:17px}
  #serveGuide{padding:7px 10px}}
-/* v2.9.1: screenshot-readable match level, separate from timers and score.
-   Show the actual AI setting; local two-player matches have no CPU level. */
-#difficultyHud{position:absolute;z-index:5;pointer-events:none;
- top:max(64px,calc(env(safe-area-inset-top,0px) + 60px));
- right:max(12px,calc(env(safe-area-inset-right,0px) + 9px));
- border-radius:8px;padding:6px 9px;
- background:rgba(4,49,78,.77);border:1px solid #ffffff65;
- color:white;text-shadow:0 1px 2px #00334e;
- font:750 clamp(11px,1.8vw,14px)/1.2 system-ui;
- white-space:nowrap;box-shadow:0 2px 9px #002a4670}
+/* v2.9.2: concise level exactly replaces Playing / Paused in the
+   top-left match HUD. Screen-reader status messages stay accessible. */
+#stage .hud #difficultyHud{position:relative;top:auto;right:auto;
+ display:inline-flex;align-items:center;justify-content:center;
+ pointer-events:none!important;margin:0;min-width:50px;
+ color:#fff;background:rgba(4,49,78,.58)!important;
+ border:1px solid rgba(255,255,255,.27)!important;
+ border-radius:8px!important;padding:4px 8px!important;
+ font:750 clamp(12px,1.8vw,16px)/1.2 system-ui!important;
+ text-shadow:0 1px 2px #00334e!important;white-space:nowrap}
+#stage .hud .hud-announcement{position:absolute!important;
+ width:1px!important;height:1px!important;overflow:hidden!important;
+ clip-path:inset(50%)!important;white-space:nowrap!important}
 #finalDifficulty[hidden]{display:none!important}
 .overlay .dialog #finalDifficulty{font:750 clamp(14px,2vw,17px)/1.3 system-ui;
  margin:5px auto 11px;color:#ffe486;letter-spacing:.02em}
-@media (orientation:landscape) and (max-height:360px){
- #difficultyHud{top:max(55px,calc(env(safe-area-inset-top,0px) + 50px));
- padding:4px 6px;font-size:11px}
-}
 </style></head><body class="fullscreen"><main>
 <div id="stage" class="stage"><canvas id="game" width="800" height="500" aria-label="Red and blue blobs playing volleyball on a beach"></canvas>
 <div class="hud">
-  <div class="left-hud"><span id="status" class="mini" aria-live="polite">Ready</span><button class="clock" id="matchTimer" type="button" aria-label="View match timer history" aria-haspopup="dialog">Match 00:00</button><button class="clock" id="pointTimer" type="button" aria-label="View point timer history" aria-haspopup="dialog">Point 00:00</button></div>
+  <div class="left-hud"><span id="difficultyHud" class="mini difficulty-hud" aria-label="Current match difficulty">Normal</span><span id="status" class="hud-announcement" aria-live="polite">Ready</span><button class="clock" id="matchTimer" type="button" aria-label="View match timer history" aria-haspopup="dialog">Match 00:00</button><button class="clock" id="pointTimer" type="button" aria-label="View point timer history" aria-haspopup="dialog">Point 00:00</button></div>
   <div class="buttons"><button id="pauseBtn" class="mini" type="button">⏸ Pause</button><button id="menuButton" class="mini" type="button" aria-label="Open game menu" aria-haspopup="dialog" aria-controls="overlay">☰ Menu</button></div>
 </div>
-<div id="difficultyHud" class="difficulty-hud" aria-label="Current match difficulty">Difficulty: Normal</div>
 <button id="playerNameButton" type="button" class="player-name-button" aria-label="Change your player name" aria-haspopup="dialog">PLAYER</button>
 <div id="message" class="message" hidden aria-live="polite"></div>
 <div class="controls" id="controls"><div class="control" id="movementPad" data-control="slide" role="slider" aria-label="Slide your finger left or right to move Red Blobby" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" tabindex="0"><span class="slide-track"><span class="slide-thumb" id="slideThumb"></span></span></div><button class="control" type="button" data-control="jump" aria-label="Jump anywhere on the right half of the court"></button></div>
@@ -651,7 +649,7 @@ html:fullscreen body,html:-webkit-full-screen body{
  </section>
 </div>
 <div id="settingsPanel" class="settings-panel" role="dialog" aria-modal="true" aria-label="Game settings" hidden><div class="settings-dialog">
-<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.9.1</small></p>
+<h2>⚙ Settings</h2><p class="settings-name">🏐 Rico Blobby Volleyball <small>v2.9.2</small></p>
 <label class="settings-field">Difficulty<select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label><p class="difficulty-note" id="difficultyDescription">Normal • balanced speed, timing and aim</p>
 <button id="sound" class="settings-action" type="button">🔊 Sound on</button><button id="controlGuideSetting" class="settings-action" type="button">👆 Show controls guide</button>
 <button id="resetLearning" class="settings-action" type="button">🧠 Reset Blue AI</button>
@@ -1107,9 +1105,9 @@ function showFinalMatchTime(durationMs){
 // The screenshot label reads that same setting, not a separate default.
 // Local human-vs-human Wi-Fi matches have no Easy/Normal/Hard AI opponent.
 function currentMatchLevelLabel(){
- if(localMode!=='ai')return 'Mode: Wi-Fi • 2 Players';
+ if(localMode!=='ai')return 'Wi-Fi';
  const levels={easy:'Easy',normal:'Normal',hard:'Hard'};
- return 'Difficulty: '+(levels[$('difficulty').value]||'Normal');
+ return levels[$('difficulty').value]||'Normal';
 }
 function updateMatchLevelBadge(){
  $('difficultyHud').textContent=currentMatchLevelLabel();
@@ -1914,7 +1912,10 @@ function loop(now){
  let dt=Math.min(1.8,rawDelta/16.67||1);
  last=now;
  if(running&&!paused&&localMode!=='guest'){
-  if(matchStarted)matchMs+=rawDelta;
+  // Count only active ball play: neither the opening serve nor
+  // waiting for any later serve consumes match time. This is the same
+  // contact-gated state used by the point timer.
+  if(matchStarted&&!awaitServe)matchMs+=rawDelta;
   if(!awaitServe)pointMs+=rawDelta;
   tick(dt);
   updateTimers();
