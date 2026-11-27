@@ -11,8 +11,10 @@ const extract=(start,end)=>{
 const hud=html.slice(html.indexOf('<div class="hud">'),html.indexOf('</div>\n<button id="playerNameButton"'));
 const popup=html.slice(html.indexOf('<div id="overlay"'),html.indexOf('<div id="playerNamePanel"'));
 assert(hud.includes('id="menuButton"'),'An in-game Menu button is required');
-assert(hud.includes('id="restart"')&&hud.includes('id="pauseBtn"'),
- 'Retain Restart and Pause alongside Menu');
+assert(!hud.includes('id="restart"')&&hud.includes('id="pauseBtn"'),
+ 'Restart moves to the pause panel; only Pause and Menu stay in the HUD');
+assert(html.includes('id="pausePanel"')&&html.includes('id="restart" type="button"'),
+ 'Restart must be in the pause pop-up');
 assert(!hud.includes('id="settingsButton"'),'Settings must stay in opening menu, not HUD');
 assert(popup.includes('id="resumeMatch" type="button" hidden'),
  'Opening pop-up must have an initially hidden Resume Match option');
