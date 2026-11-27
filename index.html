@@ -1146,6 +1146,10 @@ function startAiFromMenu(){
   });
 }
 function openWifiFromMenu(){
+ // Settings lives above the court; close it before showing the court-based
+ // discard confirmation, otherwise the confirmation cannot be tapped.
+ $('settingsPanel').hidden=true;
+ $('settingsButton').setAttribute('aria-expanded','false');
  requestDiscardConfirmation(
   'Leave the current match and open Wi-Fi pairing? Scores and match time will be discarded.',
   ()=>{
