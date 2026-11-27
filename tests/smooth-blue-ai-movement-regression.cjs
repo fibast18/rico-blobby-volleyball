@@ -74,7 +74,7 @@ assert(hard.blue.x>normal.blue.x+4&&normal.blue.x>easy.blue.x+4,
 // Human guest Blue stays on its established network-controlled path.
 const guest=setup('hard');
 guest.ctx.localMode='host';
-guest.blue.x=600;guest.blue.vx=0;
+guest.blue.x=600;guest.blue.vx=0;guest.blue.cpuSpeed=6.6;
 vm.runInContext('move(blue,1,false,1)',guest.ctx);
 assert(Math.abs(guest.blue.vx-6.6)<.001,
  'Human Blue movement in local Wi-Fi mode must remain unchanged');
