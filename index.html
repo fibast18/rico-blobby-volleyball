@@ -2072,10 +2072,30 @@ const updateDifficultyDescription=()=>{
  };
  $('difficultyDescription').textContent=descriptions[$('difficulty').value]||descriptions.normal;
 };
-$('difficulty').addEventListener('change',()=>{
+let selectedDifficulty=$('difficulty').value;
+function changeDifficulty(){
+ const next=$('difficulty').value;
+ if(next===selectedDifficulty)return;
+ if(running&&localMode==='ai'){
+  // Keep the original setting authoritative until the player confirms.
+  $('difficulty').value=selectedDifficulty;
+  closeSettings();
+  setPaused(true);
+  requestDiscardConfirmation(
+   'Change difficulty and start a new match from 0–0? The current score and match time will be discarded.',
+   ()=>{
+    selectedDifficulty=next;
+    $('difficulty').value=next;
+    updateDifficultyDescription();
+    begin();
+   });
+  return;
+ }
+ selectedDifficulty=next;
  updateDifficultyDescription();
  updateMatchLevelBadge();
-});
+}
+$('difficulty').addEventListener('change',changeDifficulty);
 updateDifficultyDescription();
 updateMatchLevelBadge();
 $('sound').onclick=()=>{sound=!sound;$('sound').textContent=sound?'🔊 Sound on':'🔇 Sound off'};
