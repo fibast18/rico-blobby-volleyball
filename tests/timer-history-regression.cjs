@@ -38,7 +38,7 @@ const state={
   getItem:key=>data.has(key)?data.get(key):null,
   setItem:(key,value)=>data.set(key,value),
  },
- red:{score:0},blue:{score:0},pointMs:0,matchMs:0,running:false,paused:false,
+ playerName:'Rico',localMode:'ai',red:{score:0},blue:{score:0},pointMs:0,matchMs:0,running:false,paused:false,
  $:id=>elements[id],
  document:{activeElement:node(),createElement:node},
  setPaused(value){this.paused=value},
@@ -57,6 +57,8 @@ assert.equal(saved.points.length,1);
 assert.equal(saved.points[0].durationMs,12340);
 assert.equal(saved.points[0].number,1);
 assert.equal(saved.points[0].redScore,1);
+assert.equal(saved.points[0].playerName,'Rico');
+state.playerName='Another player';
 vm.runInContext('red.score=1;blue.score=1;pointMs=7000;matchMs=37000;recordPointTime("blue")',state);
 saved=JSON.parse(data.get('rico-blobby-time-history-v1'));
 assert.equal(saved.points.length,2);
@@ -70,17 +72,18 @@ assert.equal(saved.matches[0].durationMs,248000);
 assert.equal(saved.matches[0].redScore,15);
 assert.equal(saved.matches[0].blueScore,8);
 assert.equal(saved.matches[0].winner,'red');
+assert.equal(saved.matches[0].playerName,'Rico');
 vm.runInContext('recordMatchTime("completed")',state);
 saved=JSON.parse(data.get('rico-blobby-time-history-v1'));
 assert.equal(saved.matches.length,1,'One match must never be duplicated');
 
 vm.runInContext('timeHistory=loadTimeHistory()',state);
 vm.runInContext('showTimeHistory("points")',state);
-assert.equal(elements.historyItems.children.length,2,'Point list must show saved rallies');
+assert.equal(elements.historyItems.children.length,3,'Point list must show saved rallies');
 assert.equal(elements.historySummary.textContent,'2 recorded points • newest first');
 vm.runInContext('showTimeHistory("matches")',state);
-assert.equal(elements.historyItems.children.length,1,'Match list must show saved games');
-assert(elements.historyItems.children[0].children[0].children[0].textContent.includes('Red won'),
+assert.equal(elements.historyItems.children.length,2,'Match list must show saved games');
+assert(elements.historyItems.children[1].children[0].children[0].textContent.includes('Red won'),
  'Completed match must show the winner');
 state.running=true;state.paused=false;
 vm.runInContext('openTimeHistory("points")',state);
@@ -96,3 +99,7 @@ assert.equal(saved.matches.length,2,'Restarted games keep their own duration');
 assert.equal(saved.matches[0].status,'restarted');
 assert.equal(saved.matches[0].durationMs,42000);
 console.log('Match and point time history, local persistence, paused viewing and restart history passed.');
+
+assert.equal(saved.matches[0].playerName,'Another player');
+assert.equal(vm.runInContext('historyPlayer({})',state),'Unknown player');
+assert(elements.historyItems.children[0].children[0].children[0].textContent.includes('Longest rally • Rico'));
