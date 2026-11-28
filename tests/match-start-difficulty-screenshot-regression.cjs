@@ -21,18 +21,14 @@ assert(hud.includes('id="status" class="hud-announcement"'),
  'Playing/Paused stays announced to accessibility tools, not shown in screenshot');
 assert(!html.includes('<div id="difficultyHud"'),
  'Separate difficulty badge must be removed from upper-right');
-assert(result.includes('id="finalDifficulty" class="final-difficulty" hidden'),
- 'Final-score pop-up must include a separate difficulty label');
-assert(result.indexOf('id="finalMatchTime"')<result.indexOf('id="finalDifficulty"'),
- 'Completed level must appear underneath the score and duration');
+assert(!result.includes('id="finalDifficulty"'), 'Results must not duplicate the HUD difficulty');
 assert(html.includes("if(matchStarted&&!awaitServe)matchMs+=rawDelta;"),
  'A match cannot count time before a serve OR between active rallies');
 assert(html.includes("if(awaitServe){\n  matchStarted=true;"),
  'Opening serve collision must activate the match clock');
 assert(html.includes('firstServeContact();'),
  'First physical serve should be the trigger for the control fade');
-assert((html.match(/showFinalMatchLevel\(\);/g)||[]).length>=2,
- 'Both host/solo and guest final-score screens must identify the match level');
+assert(!html.includes('showFinalMatchLevel'), 'Results must not reveal a duplicate level');
 assert(html.includes("updateMatchLevelBadge();"),
  'Match labels must update when the game mode or AI setting changes');
 const elements=new Map();
@@ -117,18 +113,10 @@ for(const value of ['easy','normal','hard']){
  vm.runInContext('updateMatchLevelBadge()',ctx);
  assert.equal(el('difficultyHud').textContent,
   value[0].toUpperCase()+value.slice(1));
- vm.runInContext('showFinalMatchLevel()',ctx);
- assert.equal(el('finalDifficulty').textContent,
-  value[0].toUpperCase()+value.slice(1));
- assert.equal(el('finalDifficulty').hidden,false);
 }
-el('difficulty').value='easy';
-assert.equal(el('finalDifficulty').textContent,'Hard',
- 'Completed screenshot must retain its finished difficulty if Settings changes');
 ctx.localMode='host';
-vm.runInContext('updateMatchLevelBadge();showFinalMatchLevel()',ctx);
+vm.runInContext('updateMatchLevelBadge()',ctx);
 assert.equal(el('difficultyHud').textContent,'Wi-Fi');
-assert.equal(el('finalDifficulty').textContent,'Wi-Fi');
 ctx.localMode='guest';
 vm.runInContext('updateMatchLevelBadge()',ctx);
 assert.equal(el('difficultyHud').textContent,'Wi-Fi');
