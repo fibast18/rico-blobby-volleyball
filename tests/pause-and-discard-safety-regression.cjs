@@ -108,3 +108,32 @@ vm.runInContext('confirmDiscard()',b.ctx);
 assert.equal(b.calls.starts,1,'Only confirmed New AI Match may restart gameplay');
 
 console.log('Pause popup, restart confirmation, mode-switch cancellation, Wi-Fi match protection and resume passed.');
+
+// Difficulty change must not modify the active setting until confirmed.
+const d=peer('ai');
+d.$('difficulty').value='normal';
+d.ctx.closeSettings=()=>{};
+d.ctx.updateDifficultyDescription=()=>{};
+vm.runInContext(extract("let selectedDifficulty=","$('difficulty').addEventListener('change',changeDifficulty);"),d.ctx);
+d.$('difficulty').value='hard';
+vm.runInContext('changeDifficulty()',d.ctx);
+assert.equal(d.$('difficulty').value,'normal');
+assert.equal(d.calls.starts,0);
+assert.equal(d.ctx.paused,true);
+vm.runInContext('cancelDiscard()',d.ctx);
+assert.equal(d.$('difficulty').value,'normal');
+assert.equal(d.ctx.red.score,6);
+d.$('difficulty').value='hard';
+vm.runInContext('changeDifficulty();confirmDiscard()',d.ctx);
+assert.equal(d.$('difficulty').value,'hard');
+assert.equal(d.calls.starts,1);
+vm.runInContext('changeDifficulty()',d.ctx);
+assert.equal(d.calls.starts,1,'Same difficulty must not restart');
+d.ctx.localMode='host';
+d.$('difficulty').value='easy';
+vm.runInContext('changeDifficulty()',d.ctx);
+assert.equal(d.calls.starts,1,'Wi-Fi match must not restart');
+d.ctx.localMode='ai';d.ctx.running=false;
+d.$('difficulty').value='normal';
+vm.runInContext('changeDifficulty()',d.ctx);
+assert.equal(d.calls.starts,1,'Idle difficulty selection must not start a match');
