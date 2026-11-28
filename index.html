@@ -899,7 +899,7 @@ function loadTimeHistory(){
  }catch{return {matches:[],points:[]}}
 }
 let timeHistory=loadTimeHistory();
-let matchId=null,matchStartedAt=0,pointNumber=0;
+let matchId=null,matchStartedAt=0,pointNumber=0,matchPlayer=null,matchOpponent=null,matchMode=null;
 let historyView='matches',historyWasPlaying=false,historyPreviousFocus=null;
 function saveTimeHistory(){
  try{localStorage.setItem(HISTORY_KEY,JSON.stringify(timeHistory))}catch{}
@@ -907,6 +907,9 @@ function saveTimeHistory(){
 function newMatchIdentity(){
  matchId=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9);
  matchStartedAt=Date.now();pointNumber=0;
+ matchPlayer=typeof playerName==='string'?playerName:null;
+ matchMode=typeof localMode==='string'?localMode:'ai';
+ matchOpponent=matchMode==='ai'?'Blue AI':(typeof peerName==='string'?peerName:null);
 }
 function recordPointTime(winner){
  if(!matchId)newMatchIdentity();
@@ -914,7 +917,7 @@ function recordPointTime(winner){
  const id=matchId+':'+pointNumber;
  if(timeHistory.points.some(p=>p.id===id))return;
  timeHistory.points.unshift({
-  id,matchId,number:pointNumber,winner,
+  id,matchId,number:pointNumber,winner,playerName:matchPlayer,opponentName:matchOpponent,mode:matchMode,
   redScore:red.score,blueScore:blue.score,
   durationMs:Math.max(0,Math.round(pointMs)),
   matchElapsedMs:Math.max(0,Math.round(matchMs)),at:Date.now()
@@ -930,7 +933,7 @@ function recordMatchTime(status){
   id:matchId,at:Date.now(),startedAt:matchStartedAt,
   durationMs:Math.max(0,Math.round(matchMs)),
   redScore:red.score,blueScore:blue.score,points:pointNumber,
-  status,winner
+  status,winner,playerName:matchPlayer,opponentName:matchOpponent,mode:matchMode
  });
  timeHistory.matches.length=Math.min(timeHistory.matches.length,HISTORY_MATCH_LIMIT);
  saveTimeHistory();
@@ -953,6 +956,10 @@ function historyRow(title,duration,detail){
  row.append(top,subtitle);
  return row;
 }
+function historyPlayer(entry){
+ const name=entry.playerName||'Unknown player';
+ return entry.mode&&entry.mode!=='ai'?name+' vs '+(entry.opponentName||'Unknown opponent'):name;
+}
 function showTimeHistory(view){
  historyView=view==='points'?'points':'matches';
  $('historyMatches').setAttribute('aria-selected',String(historyView==='matches'));
@@ -971,16 +978,21 @@ function showTimeHistory(view){
    'No points recorded yet. Each scored rally will appear here.';
   items.append(empty);return;
  }
+ const eligible=entries.filter(e=>e.durationMs>0&&(historyView==='points'||(e.status==='completed'&&(e.mode==='guest'?e.winner==='blue':e.winner==='red'))));
+ if(eligible.length){
+  const best=eligible.reduce((a,b)=>historyView==='matches'?(a.durationMs<=b.durationMs?a:b):(a.durationMs>=b.durationMs?a:b));
+  items.append(historyRow((historyView==='matches'?'Fastest win':'Longest rally')+' • '+historyPlayer(best),best.durationMs,historyView==='matches'?'Score '+best.redScore+':'+best.blueScore: 'Point '+best.number));
+ }
  for(const entry of entries){
   if(historyView==='matches'){
    const result=entry.status==='completed'?
     (entry.winner==='red'?'Red won':'Blue won'):'Restarted';
    items.append(historyRow(result+' • '+entry.redScore+':'+entry.blueScore,
-    entry.durationMs,historyDate(entry.at)+' • '+entry.points+' point'+(entry.points===1?'':'s')));
+    entry.durationMs,historyPlayer(entry)+' • '+historyDate(entry.at)+' • '+entry.points+' point'+(entry.points===1?'':'s')));
   }else{
    const team=entry.winner==='red'?'Red':'Blue';
    items.append(historyRow('Point '+entry.number+' • '+team,
-    entry.durationMs,historyDate(entry.at)+' • Score '+entry.redScore+':'+entry.blueScore));
+    entry.durationMs,historyPlayer(entry)+' • '+historyDate(entry.at)+' • Score '+entry.redScore+':'+entry.blueScore));
   }
  }
 }
@@ -1013,7 +1025,7 @@ function saveMatch(){
  const snapshot={
   savedAt:Date.now(),W,red:pick(red),blue:pick(blue),ball:pick(ball),
   matchMs,pointMs,matchStarted,server,awaitServe,frame,rallyTicks,
-  matchId,matchStartedAt,pointNumber,lastVolleySide,consecutiveTouches
+  matchId,matchStartedAt,pointNumber,lastVolleySide,consecutiveTouches,matchPlayer,matchOpponent,matchMode
  };
  try{localStorage.setItem(MATCH_KEY,JSON.stringify(snapshot))}catch{}
 }
@@ -1046,6 +1058,9 @@ function restoreSavedMatch(){
    (matchMs>0||pointMs>0||v.red.score+v.blue.score>0||v.awaitServe===false);
  matchId=typeof v.matchId==='string'&&v.matchId.length<80?v.matchId:null;
  if(!matchId)newMatchIdentity();
+ matchPlayer=typeof v.matchPlayer==='string'?v.matchPlayer:null;
+ matchOpponent=typeof v.matchOpponent==='string'?v.matchOpponent:null;
+ matchMode=typeof v.matchMode==='string'?v.matchMode:'ai';
  matchStartedAt=Number.isFinite(v.matchStartedAt)?v.matchStartedAt:Date.now()-matchMs;
  pointNumber=Number.isFinite(v.pointNumber)?clamp(v.pointNumber,0,100):red.score+blue.score;
  frame=Number(v.frame)||0;rallyTicks=Number(v.rallyTicks)||0;
